@@ -1,7 +1,7 @@
 # Pre-commit hooks for terraform-aws-codeartifact-quarantine.
 #
 # Install:
-#   pip install pre-commit
+#   uv tool install pre-commit       # or `pip install pre-commit` if uv isn't available
 #   pre-commit install
 #
 # Run on all files:

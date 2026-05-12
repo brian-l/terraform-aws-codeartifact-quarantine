@@ -2,6 +2,16 @@
 
 All notable changes to this module are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Unit test suite for all six Lambda handlers and the shared `common/` modules (53 tests). Uses `botocore.stub.Stubber` for AWS API mocking — no live AWS calls or extra service emulators. CI runs the suite with a coverage gate via the `astral-sh/setup-uv` action.
+
+### Fixed
+
+- `_iso8601_to_seconds` in the ingestion handler now uses a regex parser supporting the full subset of ISO-8601 durations the module uses (D + H + M + S in any combination, e.g. `P1DT12H`, `PT1H30M45S`). The previous parser silently ignored seconds and certain combinations.
+
 ## [0.1.0] - 2026-05-12
 
 ### Security

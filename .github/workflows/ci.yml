@@ -70,3 +70,33 @@ jobs:
       - name: terraform validate
         working-directory: examples/simple
         run: terraform validate
+
+  lambda-tests:
+    name: Lambda unit tests
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        # boto3 and boto3-stubs versions match those exercised by pre-commit's
+        # pyright hook so test failures mirror production-time type errors.
+        run: |
+          uv pip install --system \
+            'boto3==1.43.6' \
+            'boto3-stubs[essential,codeartifact,inspector2,lambda,sns,sqs,stepfunctions,dynamodb]==1.43.6' \
+            'pytest==9.0.3' \
+            'pytest-cov==7.1.0' \
+            'pytest-mock==3.15.1'
+
+      - name: Run pytest
+        run: pytest --cov=lambda --cov-report=term-missing --cov-fail-under=85

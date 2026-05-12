@@ -3,8 +3,8 @@
 ## Local setup
 
 ```bash
-# Install pre-commit (one-time)
-pip install pre-commit
+# Install pre-commit (one-time) via uv
+uv tool install pre-commit
 
 # Install the hooks into your local repo
 pre-commit install
@@ -28,6 +28,26 @@ No build step is required. `archive_file` blocks in `modules/pipeline/lambdas.tf
 assemble each Lambda's zip from `handler.py` + every file in `lambda/common/`
 directly. Adding or editing any common module is picked up on the next
 `terraform plan`.
+
+## Running the Lambda unit tests
+
+Install [uv](https://docs.astral.sh/uv/) once, then:
+
+```bash
+uv venv
+source .venv/bin/activate    # or: uv run pytest
+uv pip install boto3 'boto3-stubs[essential,codeartifact,inspector2,lambda,sns,sqs,stepfunctions,dynamodb]' pytest pytest-cov pytest-mock
+pytest
+```
+
+Tests use `botocore.stub.Stubber` for AWS API mocking — no live AWS calls,
+no extra dependencies beyond what pyright already needs. CI runs the same
+command via `astral-sh/setup-uv` with a coverage gate (see `.github/workflows/ci.yml`).
+
+The test harness configures env vars that each handler module reads at import
+time (via `common.config.from_env()`); see `lambda/tests/conftest.py`. To test
+configuration changes, monkeypatch the env and use the `fresh_module` fixture
+to re-import the handler under test.
 
 ## Module structure
 

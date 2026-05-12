@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
 from typing import TYPE_CHECKING, Any
 
@@ -84,20 +85,24 @@ def _process(record: dict[str, Any]) -> None:
     )
 
 
+_ISO8601_RE = re.compile(
+    r"^P(?:(?P<d>\d+)D)?" r"(?:T(?:(?P<h>\d+)H)?(?:(?P<m>\d+)M)?(?:(?P<s>\d+)S)?)?$"
+)
+
+
 def _iso8601_to_seconds(duration: str) -> int:
-    """Minimal ISO-8601 duration parser. Handles PT<H>H, PT<M>M, P<D>D — enough for our config."""
-    if not duration.startswith("P"):
-        raise ValueError(f"invalid ISO-8601 duration: {duration}")
-    s = duration[1:]
-    days = hours = minutes = 0
-    if "T" in s:
-        date_part, time_part = s.split("T", 1)
-    else:
-        date_part, time_part = s, ""
-    if date_part.endswith("D"):
-        days = int(date_part[:-1])
-    if time_part.endswith("H"):
-        hours = int(time_part[:-1])
-    elif time_part.endswith("M"):
-        minutes = int(time_part[:-1])
-    return days * 86400 + hours * 3600 + minutes * 60
+    """Minimal ISO-8601 duration parser supporting the subset our config uses.
+
+    Recognises P<D>D, PT<H>H, PT<M>M, PT<S>S and any combination thereof, e.g.
+    P1DT12H, PT1H30M, PT45S. Fractional seconds and the year/month components
+    are intentionally not supported — surface that as an error rather than
+    silently returning zero.
+    """
+    match = _ISO8601_RE.match(duration)
+    if not match or duration in {"P", "PT"}:
+        raise ValueError(f"invalid ISO-8601 duration: {duration!r}")
+    days = int(match.group("d") or 0)
+    hours = int(match.group("h") or 0)
+    minutes = int(match.group("m") or 0)
+    seconds = int(match.group("s") or 0)
+    return days * 86400 + hours * 3600 + minutes * 60 + seconds

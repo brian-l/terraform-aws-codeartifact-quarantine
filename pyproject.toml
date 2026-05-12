@@ -3,6 +3,21 @@
 # Not a packaging file — each Lambda is its own zip. This just centralises
 # linter / type-checker config so pre-commit hooks have something to read.
 
+[tool.pytest.ini_options]
+# `lambda/` on the pythonpath lets test modules do `from common.config import ...`
+# and `import promote.handler` etc. matching the way Lambda's /var/task layout
+# behaves at runtime.
+pythonpath = ["lambda"]
+testpaths = ["lambda/tests"]
+addopts = "--strict-markers --strict-config -ra"
+filterwarnings = [
+  "error",
+  # boto3 ships internal DeprecationWarnings on older Pythons we don't care about;
+  # surface our own warnings as errors but tolerate library noise.
+  "default::DeprecationWarning:botocore",
+  "default::DeprecationWarning:boto3",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -47,6 +62,9 @@ exclude = [
   "lambda/audit/common",
   "lambda/expedite/common",
   "lambda/approve/common",
+  # Tests use heavy mocking + dynamic patterns that conflict with pyright strict.
+  # Lint production code rigorously; let tests stay flexible.
+  "lambda/tests",
   "**/__pycache__",
 ]
 extraPaths = ["lambda"]
