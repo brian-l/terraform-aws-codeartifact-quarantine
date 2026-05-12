@@ -59,5 +59,33 @@ See [`PLAN.md`](./PLAN.md) for the architecture and roadmap. Key invariants:
 Versions follow semver. Breaking changes to the variable schema bump MAJOR.
 
 1. Update `CHANGELOG.md`.
-2. Tag `vX.Y.Z` on `main`.
-3. GitHub Actions publishes to the Terraform Registry (TODO once `.github/workflows/release.yml` lands).
+2. **Create a GPG- or SSH-signed annotated tag**: `git tag -s vX.Y.Z -m "release vX.Y.Z"`. Unsigned tags will not produce a verifiable release artifact.
+3. Push the tag: `git push origin vX.Y.Z`.
+4. `.github/workflows/release.yml` fires automatically: builds a `git archive` tarball, attests SLSA build provenance via Sigstore (using GitHub Actions OIDC), and creates a GitHub Release with both the artifact and its checksum.
+5. Verify the release end-to-end as a consumer would:
+   ```bash
+   gh attestation verify terraform-aws-codeartifact-quarantine-X.Y.Z.tar.gz --owner brian-l
+   git tag -v vX.Y.Z
+   ```
+
+## Contributor identity
+
+If you're contributing via pull request and don't want to expose a personal email in commit metadata, configure git to use a [GitHub no-reply address](https://github.com/settings/emails):
+
+```bash
+git config user.email "<your-id>+<your-username>@users.noreply.github.com"
+```
+
+CI does not enforce this, but every commit author appears publicly on the repo's commit history once merged.
+
+## Updating pinned dependencies
+
+Pre-commit hook revs are pinned to full commit SHAs. To update:
+
+```bash
+pre-commit autoupdate --freeze
+```
+
+`--freeze` resolves the latest tagged release to a commit SHA. Review the diff against the upstream repo's actual release before committing — verify the SHA appears on the published Releases page, not just the moving tag.
+
+For GitHub Actions in `.github/workflows/`, Dependabot opens weekly PRs that rewrite both the SHA and the `# vX.Y.Z` comment. Manual updates should follow the same pattern: SHA in the `uses:`, version in a trailing comment.

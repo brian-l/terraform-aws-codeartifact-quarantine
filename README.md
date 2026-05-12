@@ -136,6 +136,24 @@ The module assumes you have:
 
 ---
 
+## Verifying a release
+
+Because this module's purpose is supply-chain protection, its own supply chain is held to the same standard. Every release ships with a SLSA build provenance attestation signed by Sigstore via GitHub Actions OIDC. To verify a release tarball:
+
+```bash
+gh attestation verify terraform-aws-codeartifact-quarantine-<version>.tar.gz --owner brian-l
+git tag -v v<version>     # signed tag verification
+sha256sum -c terraform-aws-codeartifact-quarantine-<version>.tar.gz.sha256
+```
+
+Module-internal supply-chain practices are documented in [`SECURITY.md`](./SECURITY.md):
+
+- Pre-commit hooks pinned to full commit SHAs (not tags)
+- GitHub Actions pinned to full commit SHAs in `.github/workflows/`
+- Releases attested via [SLSA Provenance v1.0](https://slsa.dev/spec/v1.0/provenance) through Sigstore
+- Dependabot watches for dependency drift; security advisories bypass the weekly cadence
+- Release tags are GPG/SSH-signed by the maintainer
+
 ## License
 
 MIT — see [`LICENSE`](./LICENSE).

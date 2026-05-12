@@ -7,12 +7,19 @@
 # Run on all files:
 #   pre-commit run --all-files
 #
-# Hook versions are pinned. Bump via `pre-commit autoupdate`.
+# Supply-chain note: hook revs are pinned to full 40-char commit SHAs, not tags.
+# Tags can be force-moved by the maintainer (or an attacker who compromises the
+# maintainer's account); commit SHAs cannot. The `# vX.Y.Z` comment after each
+# rev is for human readability only.
+#
+# To update: run `pre-commit autoupdate --freeze`, which resolves the latest
+# tagged release to a commit SHA and writes it back. Review the diff before
+# committing — verify the new SHA on GitHub Releases, not just the tag name.
 
 repos:
   # ── Generic hygiene ──────────────────────────────────────────────────────
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b  # v5.0.0
     hooks:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
@@ -30,7 +37,7 @@ repos:
 
   # ── Terraform ────────────────────────────────────────────────────────────
   - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.96.2
+    rev: e0322737dccad136b751416f9e45d9980fe18435  # v1.96.2
     hooks:
       # Canonical formatting. Fails if anything is unformatted.
       - id: terraform_fmt
@@ -63,7 +70,7 @@ repos:
 
   # ── Python (Lambda handlers) ─────────────────────────────────────────────
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+    rev: f0b5944bef86f50d875305821a0ab0d8c601e465  # v0.8.4
     hooks:
       - id: ruff
         files: ^lambda/
@@ -72,17 +79,19 @@ repos:
         files: ^lambda/
 
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.409
+    rev: d7508e5425d3d02761d70dab1f9a2086573af429  # v1.1.409
     hooks:
       - id: pyright
         files: ^lambda/
         # Lambda handlers use boto3 stubs in dev only; not vendored at runtime.
+        # The boto3-stubs version is pinned exact (not >=) to keep the dev
+        # environment reproducible.
         additional_dependencies:
-          - "boto3-stubs[essential,codeartifact,inspector2,lambda,sns,sqs,stepfunctions,dynamodb]"
+          - "boto3-stubs[essential,codeartifact,inspector2,lambda,sns,sqs,stepfunctions,dynamodb]==1.43.6"
 
   # ── Spell-check long-form prose (READMEs, PLAN.md) ───────────────────────
   - repo: https://github.com/crate-ci/typos
-    rev: v1.28.4
+    rev: 9d890159570d5018df91fedfa40b4730cd4a81b1  # v1.28.4
     hooks:
       - id: typos
         # Don't fail on typos in vendored output; only project-authored content.
