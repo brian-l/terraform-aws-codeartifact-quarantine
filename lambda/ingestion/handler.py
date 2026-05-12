@@ -27,8 +27,9 @@ import os
 import uuid
 from typing import TYPE_CHECKING, Any
 
-# common/ is bundled into this Lambda's zip by `make -C lambda`; Lambda's
-# /var/task is already on sys.path at runtime, so no path manipulation needed.
+# common/ is bundled into this Lambda's zip by archive_file (see
+# modules/pipeline/lambdas.tf). Lambda's /var/task is on sys.path at runtime,
+# so `from common.config import ...` works without any path manipulation.
 import boto3
 
 from common.config import from_env

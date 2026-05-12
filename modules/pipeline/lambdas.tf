@@ -37,6 +37,13 @@ locals {
     + tonumber(coalesce(local._cooldown_match.s, "0"))
   )
 
+  # Shared common/ files included in every Lambda zip. We assemble the zip
+  # directly from these paths via archive_file `source` blocks, so no `make`
+  # step is needed — archive_file recomputes the hash on every plan based on
+  # current file contents. Adding/removing a .py file in lambda/common/ is
+  # picked up automatically.
+  common_files = fileset("${local.lambda_root}/common", "**/*.py")
+
   # Common env vars passed to every Lambda. Specific Lambdas merge their own keys.
   #
   # NOTE: source-repo identity is intentionally absent. EventBridge events carry
@@ -59,8 +66,19 @@ data "aws_partition" "current" {}
 
 data "archive_file" "ingestion" {
   type        = "zip"
-  source_dir  = "${local.lambda_root}/ingestion"
   output_path = "${path.module}/.terraform.tmp/ingestion.zip"
+
+  source {
+    content  = file("${local.lambda_root}/ingestion/handler.py")
+    filename = "handler.py"
+  }
+  dynamic "source" {
+    for_each = local.common_files
+    content {
+      content  = file("${local.lambda_root}/common/${source.value}")
+      filename = "common/${source.value}"
+    }
+  }
 }
 
 resource "aws_cloudwatch_log_group" "ingestion" {
@@ -108,8 +126,19 @@ resource "aws_lambda_event_source_mapping" "ingestion" {
 
 data "archive_file" "scan" {
   type        = "zip"
-  source_dir  = "${local.lambda_root}/scan"
   output_path = "${path.module}/.terraform.tmp/scan.zip"
+
+  source {
+    content  = file("${local.lambda_root}/scan/handler.py")
+    filename = "handler.py"
+  }
+  dynamic "source" {
+    for_each = local.common_files
+    content {
+      content  = file("${local.lambda_root}/common/${source.value}")
+      filename = "common/${source.value}"
+    }
+  }
 }
 
 resource "aws_cloudwatch_log_group" "scan" {
@@ -148,8 +177,19 @@ resource "aws_lambda_function" "scan" {
 
 data "archive_file" "promote" {
   type        = "zip"
-  source_dir  = "${local.lambda_root}/promote"
   output_path = "${path.module}/.terraform.tmp/promote.zip"
+
+  source {
+    content  = file("${local.lambda_root}/promote/handler.py")
+    filename = "handler.py"
+  }
+  dynamic "source" {
+    for_each = local.common_files
+    content {
+      content  = file("${local.lambda_root}/common/${source.value}")
+      filename = "common/${source.value}"
+    }
+  }
 }
 
 resource "aws_cloudwatch_log_group" "promote" {
@@ -182,8 +222,19 @@ resource "aws_lambda_function" "promote" {
 
 data "archive_file" "audit" {
   type        = "zip"
-  source_dir  = "${local.lambda_root}/audit"
   output_path = "${path.module}/.terraform.tmp/audit.zip"
+
+  source {
+    content  = file("${local.lambda_root}/audit/handler.py")
+    filename = "handler.py"
+  }
+  dynamic "source" {
+    for_each = local.common_files
+    content {
+      content  = file("${local.lambda_root}/common/${source.value}")
+      filename = "common/${source.value}"
+    }
+  }
 }
 
 resource "aws_cloudwatch_log_group" "audit" {
@@ -216,8 +267,19 @@ resource "aws_lambda_function" "audit" {
 
 data "archive_file" "expedite" {
   type        = "zip"
-  source_dir  = "${local.lambda_root}/expedite"
   output_path = "${path.module}/.terraform.tmp/expedite.zip"
+
+  source {
+    content  = file("${local.lambda_root}/expedite/handler.py")
+    filename = "handler.py"
+  }
+  dynamic "source" {
+    for_each = local.common_files
+    content {
+      content  = file("${local.lambda_root}/common/${source.value}")
+      filename = "common/${source.value}"
+    }
+  }
 }
 
 resource "aws_cloudwatch_log_group" "expedite" {
@@ -250,8 +312,19 @@ resource "aws_lambda_function" "expedite" {
 
 data "archive_file" "approve" {
   type        = "zip"
-  source_dir  = "${local.lambda_root}/approve"
   output_path = "${path.module}/.terraform.tmp/approve.zip"
+
+  source {
+    content  = file("${local.lambda_root}/approve/handler.py")
+    filename = "handler.py"
+  }
+  dynamic "source" {
+    for_each = local.common_files
+    content {
+      content  = file("${local.lambda_root}/common/${source.value}")
+      filename = "common/${source.value}"
+    }
+  }
 }
 
 resource "aws_cloudwatch_log_group" "approve" {

@@ -7,27 +7,25 @@ Terraform module via `archive_file`.
 
 ```
 lambda/
-├── common/         # Shared utilities; copied into each handler before zip
+├── common/         # Shared utilities; bundled into every handler zip
 ├── ingestion/      # EventBridge -> SQS receiver, starts SFN execution
 ├── scan/           # Inspector ListFindings or custom scanner invocation
-├── promote/        # copy-package-versions staging -> prod
+├── promote/        # copy-package-versions source -> target repo
 ├── audit/          # DynamoDB put_item
 ├── expedite/       # Manual override entry point
-├── approve/        # Slack/web callback target for SFN waitForTaskToken
-└── Makefile        # Bundles common/ into each handler dir
+└── approve/        # Slack/web callback target for SFN waitForTaskToken
 ```
 
 ## Build
 
-Before `terraform apply`:
+No build step is required. `archive_file` blocks in `modules/pipeline/lambdas.tf`
+use explicit `source` blocks to include each handler's `handler.py` plus every
+file in `lambda/common/` directly. The zip is reassembled on every `terraform
+plan`, so adding or modifying any common module is picked up automatically.
 
-```bash
-make -C lambda all
-```
-
-This copies `lambda/common/` into each handler dir so `archive_file` can zip
-the handler + its shared utilities as a single deployable bundle. CI should
-run this as part of the plan step (see `.github/workflows/ci.yml`).
+(An earlier version of the module copied `common/` into each handler dir via
+a Makefile; that approach was retired because forgetting to run `make` produced
+"No module named 'common'" errors at Lambda runtime.)
 
 ## Dependencies
 

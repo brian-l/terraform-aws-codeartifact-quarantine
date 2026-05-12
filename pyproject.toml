@@ -38,8 +38,9 @@ typeCheckingMode = "strict"
 # <handler_dir>.handler — names are unique.
 include = ["lambda"]
 exclude = [
-  # `make -C lambda` vendors copies of common/ into each handler dir for the
-  # Lambda zip. Lint the source under lambda/common/, not the copies.
+  # Defensive: earlier versions of the module copied common/ into each handler
+  # dir via a Makefile. The current archive_file approach doesn't create those
+  # copies, but the exclude keeps lint clean if anyone re-introduces it.
   "lambda/ingestion/common",
   "lambda/scan/common",
   "lambda/promote/common",

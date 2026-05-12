@@ -43,11 +43,6 @@ jobs:
           terraform_version: "1.10.3"
           terraform_wrapper: false
 
-      - name: Build Lambda bundles
-        # archive_file needs common/ copied into each handler dir before
-        # `terraform validate` reads the module.
-        run: make -C lambda all
-
       - name: Run pre-commit
         uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd  # v3.0.1
 
@@ -67,9 +62,6 @@ jobs:
         with:
           terraform_version: "1.10.3"
           terraform_wrapper: false
-
-      - name: Build Lambda bundles
-        run: make -C lambda all
 
       - name: terraform init
         working-directory: examples/simple

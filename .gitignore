@@ -43,14 +43,10 @@ terraform.rc
 # archive_file output dir used by the pipeline submodule's Lambda packager
 modules/*/.terraform.tmp/
 
-# Copies of lambda/common/ vendored into each handler dir by `make -C lambda`.
-# Only ignore the copies — lambda/common/ itself is checked in.
-lambda/ingestion/common/
-lambda/scan/common/
-lambda/promote/common/
-lambda/audit/common/
-lambda/expedite/common/
-lambda/approve/common/
+# archive_file in modules/pipeline/lambdas.tf reads lambda/common/ directly
+# via explicit source blocks; no copies are made in handler subdirs anymore.
+# Kept here as a safety net in case anyone resurrects the old `make` approach.
+lambda/*/common/
 
 # ─── Python ────────────────────────────────────────────────────────────────
 

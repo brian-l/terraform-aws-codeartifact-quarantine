@@ -3,22 +3,20 @@
 Smallest viable configuration. Creates:
 
 - A CodeArtifact domain named `simple-platform`
-- Two repositories: `simple-pkg-quarantine-staging` (external connections to npm + PyPI) and `simple-pkg-quarantine-prod` (consumer-facing)
+- Three repositories: `simple-pkg-quarantine-staging-npm` (external connection to public:npmjs), `simple-pkg-quarantine-staging-pypi` (external connection to public:pypi), and `simple-pkg-quarantine-prod` (consumer-facing, upstreams both staging repos)
 - The full quarantine pipeline: EventBridge rule, SQS queue + DLQ, Step Functions state machine, 6 Lambda functions, DynamoDB audit table, KMS keys, IAM roles
 - An SNS topic for alerts (no subscribers — subscribe Slack/email manually after apply)
 
 ## Run
 
 ```bash
-# From repo root: bundle shared code into each Lambda zip
-make -C lambda all
-
-# Apply
 cd examples/simple
 terraform init
 terraform plan
 terraform apply
 ```
+
+No build step needed — `archive_file` reads `lambda/common/` directly when assembling each handler's zip.
 
 ## Verify
 

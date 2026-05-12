@@ -24,17 +24,10 @@ If a hook auto-fixes (e.g., `terraform fmt`, `ruff --fix`), re-stage and commit 
 
 ## Build before applying
 
-The Lambda handlers reference shared code under `lambda/common/`. Each handler's
-zip is built by Terraform's `archive_file`, which only follows files in its
-`source_dir`. So before `terraform apply` (or `terraform plan` for the example),
-run:
-
-```bash
-make -C lambda all
-```
-
-This copies `lambda/common/` into each handler dir. Re-run after any change to
-the shared utilities.
+No build step is required. `archive_file` blocks in `modules/pipeline/lambdas.tf`
+assemble each Lambda's zip from `handler.py` + every file in `lambda/common/`
+directly. Adding or editing any common module is picked up on the next
+`terraform plan`.
 
 ## Module structure
 
