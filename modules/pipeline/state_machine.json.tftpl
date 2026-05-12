@@ -16,9 +16,9 @@
 
     "Cooldown": {
       "Type": "Wait",
-      "Duration": "${cooldown_duration}",
+      "Seconds": ${cooldown_seconds},
       "Next": "Scan",
-      "Comment": "Configurable via var.pipeline.cooldown (ISO-8601). Default PT24H."
+      "Comment": "Configured via var.pipeline.cooldown (ISO-8601). Converted to integer Seconds by the module — Step Functions Wait does not accept Duration."
     },
 
     "Scan": {

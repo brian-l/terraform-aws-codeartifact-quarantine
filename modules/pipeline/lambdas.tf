@@ -24,6 +24,19 @@ locals {
   # name local we derive here.
   state_machine_arn = "arn:${data.aws_partition.current.partition}:states:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:stateMachine:${var.name}-quarantine"
 
+  # Convert var.cooldown (ISO-8601 duration like "PT24H", "P7D") to integer
+  # seconds. Step Functions Wait state only accepts Seconds / SecondsPath /
+  # Timestamp / TimestampPath — there's no Duration field. We support the
+  # subset of ISO-8601 our config needs: P<D>D and PT<H>H / PT<M>M / PT<S>S
+  # (and combinations like "P1DT12H"). Fail loudly on anything else.
+  _cooldown_match = regex("^P(?:(?P<d>[0-9]+)D)?(?:T(?:(?P<h>[0-9]+)H)?(?:(?P<m>[0-9]+)M)?(?:(?P<s>[0-9]+)S)?)?$", var.cooldown)
+  cooldown_seconds = (
+    tonumber(coalesce(local._cooldown_match.d, "0")) * 86400
+    + tonumber(coalesce(local._cooldown_match.h, "0")) * 3600
+    + tonumber(coalesce(local._cooldown_match.m, "0")) * 60
+    + tonumber(coalesce(local._cooldown_match.s, "0"))
+  )
+
   # Common env vars passed to every Lambda. Specific Lambdas merge their own keys.
   #
   # NOTE: source-repo identity is intentionally absent. EventBridge events carry
@@ -81,6 +94,14 @@ resource "aws_lambda_event_source_mapping" "ingestion" {
   function_name    = aws_lambda_function.ingestion.arn
   batch_size       = 10
   enabled          = true
+
+  # AWS Lambda validates that the function's role has SQS permissions at the
+  # moment the event source mapping is created. The Lambda function resource
+  # depends only on aws_iam_role, NOT on aws_iam_role_policy — so without an
+  # explicit edge here, Terraform may create the mapping before the role
+  # policy attach completes, and AWS rejects with "function execution role
+  # does not have permissions to call ReceiveMessage on SQS".
+  depends_on = [aws_iam_role_policy.ingestion]
 }
 
 # ---------- Scan ------------------------------------------------------------

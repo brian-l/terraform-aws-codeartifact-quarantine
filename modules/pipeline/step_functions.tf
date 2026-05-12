@@ -31,7 +31,7 @@ resource "aws_sfn_state_machine" "quarantine" {
     scan_lambda_arn    = aws_lambda_function.scan.arn
     promote_lambda_arn = aws_lambda_function.promote.arn
     audit_lambda_arn   = aws_lambda_function.audit.arn
-    cooldown_duration  = var.cooldown
+    cooldown_seconds   = local.cooldown_seconds
     approval_required  = var.approval.required_when
     approval_timeout   = var.approval.timeout
     notification_arn   = var.approval.notification_arn
