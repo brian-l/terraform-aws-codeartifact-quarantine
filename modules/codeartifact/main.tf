@@ -45,24 +45,48 @@ resource "aws_codeartifact_domain" "this" {
 # ---------------------------------------------------------------------------
 # Repositories
 #
-# The upstream block references the upstream repository by *self-reference* to
-# another instance of this for_each resource: `aws_codeartifact_repository.
-# this[upstream.value].repository`. That reference is what gives Terraform a
-# graph edge between the dependent repo (e.g. prod) and its upstreams
-# (e.g. staging-npm, staging-pypi).
+# Split into two resources to avoid Terraform's for_each self-reference
+# limitation. When you reference one instance of a for_each resource from
+# another instance of the *same* resource, Terraform analyzes the dependency
+# at the resource (collection) level, not per-instance — which it reports as
+# a self-cycle even when the per-instance graph would be acyclic.
 #
-# Without the self-reference, the `repository_name` would be a plain string
-# interpolation Terraform can't trace, so it would create everything in
-# parallel — and CodeArtifact rejects creation of a repo whose upstream
-# doesn't yet exist.
+# `leaf` repos have no upstreams (typically staging repos with external
+# connections). `with_upstream` repos point at leaf repos. The cross-resource
+# reference creates the graph edge that orders creates correctly.
 #
-# Terraform allows for_each self-references as long as the dependency graph is
-# acyclic. Don't introduce cycles in var.repositories (A upstreams B AND B
-# upstreams A).
+# Constraint: this supports a single layer of upstreams. A repo in
+# `with_upstream` may only reference repos in `leaf`. If you need a deeper
+# chain (A → B → C), a third resource would be required; flag in PLAN.md as a
+# v2 enhancement if anyone asks.
 # ---------------------------------------------------------------------------
 
-resource "aws_codeartifact_repository" "this" {
-  for_each = var.repositories
+locals {
+  leaf_repos = {
+    for k, v in var.repositories : k => v
+    if length(v.upstreams) == 0
+  }
+  upstream_repos = {
+    for k, v in var.repositories : k => v
+    if length(v.upstreams) > 0
+  }
+}
+
+# Validate that all upstream references point at leaf repos. Catches the
+# "deeper than one chain" case at plan time with a clear message.
+check "upstreams_point_at_leaves" {
+  assert {
+    condition = alltrue([
+      for k, v in local.upstream_repos : alltrue([
+        for u in v.upstreams : contains(keys(local.leaf_repos), u)
+      ])
+    ])
+    error_message = "All upstream references must point at leaf repositories (repos with no upstreams of their own). Multi-level upstream chains are not yet supported."
+  }
+}
+
+resource "aws_codeartifact_repository" "leaf" {
+  for_each = local.leaf_repos
 
   domain      = aws_codeartifact_domain.this.domain
   repository  = "${var.name}-${each.key}"
@@ -78,18 +102,48 @@ resource "aws_codeartifact_repository" "this" {
     }
   }
 
+  tags = var.tags
+
+  depends_on = [aws_codeartifact_domain.this]
+}
+
+resource "aws_codeartifact_repository" "with_upstream" {
+  for_each = local.upstream_repos
+
+  domain      = aws_codeartifact_domain.this.domain
+  repository  = "${var.name}-${each.key}"
+  description = each.value.description
+
+  dynamic "external_connections" {
+    for_each = each.value.external_connection == null ? [] : [each.value.external_connection]
+    content {
+      external_connection_name = external_connections.value
+    }
+  }
+
   dynamic "upstream" {
     for_each = each.value.upstreams
     content {
-      # Self-reference into the same for_each resource. Terraform reads this as
-      # "this instance depends on instance[upstream.value]" and orders creates.
-      repository_name = aws_codeartifact_repository.this[upstream.value].repository
+      # Cross-resource reference: each upstream is a leaf repo, which lives in
+      # a different resource block, so Terraform creates a clean graph edge
+      # without the for_each self-reference issue.
+      repository_name = aws_codeartifact_repository.leaf[upstream.value].repository
     }
   }
 
   tags = var.tags
 
-  depends_on = [aws_codeartifact_domain.this]
+  depends_on = [aws_codeartifact_repository.leaf]
+}
+
+# Unified view of all created repositories. Used by output blocks and
+# downstream resources (package groups, repo permissions policies). Keeps
+# consumers' interface unchanged despite the two-resource split inside.
+locals {
+  repositories = merge(
+    aws_codeartifact_repository.leaf,
+    aws_codeartifact_repository.with_upstream,
+  )
 }
 
 # ---------------------------------------------------------------------------
@@ -131,7 +185,10 @@ resource "awscc_codeartifact_package_group" "this" {
     }
   }
 
-  depends_on = [aws_codeartifact_repository.this]
+  depends_on = [
+    aws_codeartifact_repository.leaf,
+    aws_codeartifact_repository.with_upstream,
+  ]
 }
 
 # ---------------------------------------------------------------------------
@@ -168,7 +225,7 @@ resource "aws_codeartifact_repository_permissions_policy" "prod_read" {
   count = length(var.consumer_principals) > 0 && contains(keys(var.repositories), "prod") ? 1 : 0
 
   domain          = aws_codeartifact_domain.this.domain
-  repository      = aws_codeartifact_repository.this["prod"].repository
+  repository      = local.repositories["prod"].repository
   policy_document = data.aws_iam_policy_document.prod_read[0].json
 }
 

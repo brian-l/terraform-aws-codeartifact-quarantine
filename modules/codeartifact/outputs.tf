@@ -13,7 +13,7 @@ output "domain_kms_key_arn" {
 output "repositories" {
   description = "Map of repo key -> {name, arn, endpoint_npm, endpoint_pypi, endpoint_maven, endpoint_nuget}."
   value = {
-    for k, r in aws_codeartifact_repository.this : k => {
+    for k, r in local.repositories : k => {
       name           = r.repository
       arn            = r.arn
       endpoint_npm   = "https://${r.domain_owner}-${r.domain}.d.codeartifact.${data.aws_region.current.name}.amazonaws.com/npm/${r.repository}/"
@@ -27,7 +27,7 @@ output "repositories" {
 output "repository_endpoints" {
   description = "Map of repo key -> {npm, pypi, maven, nuget} endpoint URLs (shorthand for repositories[key].endpoint_*)."
   value = {
-    for k, r in aws_codeartifact_repository.this : k => {
+    for k, r in local.repositories : k => {
       npm   = "https://${r.domain_owner}-${r.domain}.d.codeartifact.${data.aws_region.current.name}.amazonaws.com/npm/${r.repository}/"
       pypi  = "https://${r.domain_owner}-${r.domain}.d.codeartifact.${data.aws_region.current.name}.amazonaws.com/pypi/${r.repository}/simple/"
       maven = "https://${r.domain_owner}-${r.domain}.d.codeartifact.${data.aws_region.current.name}.amazonaws.com/maven/${r.repository}/"
