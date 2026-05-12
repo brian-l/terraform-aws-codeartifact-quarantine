@@ -1,0 +1,71 @@
+# Python tooling configuration for the Lambda handlers in lambda/.
+#
+# Not a packaging file — each Lambda is its own zip. This just centralises
+# linter / type-checker config so pre-commit hooks have something to read.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["lambda"]
+extend-exclude = ["lambda/*/common"]  # symlinked copies, lint the source
+
+[tool.ruff.lint]
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "I",    # isort
+  "B",    # flake8-bugbear
+  "UP",   # pyupgrade
+  "RUF",  # ruff-specific
+  "SIM",  # flake8-simplify
+  "PTH",  # flake8-use-pathlib
+]
+ignore = [
+  "E501",  # line length handled by formatter
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["common"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+
+# lambda/<handler>/handler.py files all share the same module name. We point
+# pyright at lambda/ as the source root; common/ is a regular package under it,
+# and each handler dir is a namespace package whose `handler.py` becomes
+# <handler_dir>.handler — names are unique.
+include = ["lambda"]
+exclude = [
+  # `make -C lambda` vendors copies of common/ into each handler dir for the
+  # Lambda zip. Lint the source under lambda/common/, not the copies.
+  "lambda/ingestion/common",
+  "lambda/scan/common",
+  "lambda/promote/common",
+  "lambda/audit/common",
+  "lambda/expedite/common",
+  "lambda/approve/common",
+  "**/__pycache__",
+]
+extraPaths = ["lambda"]
+
+# ── Selective downgrades from strict mode ────────────────────────────────
+# boto3-stubs uses Literal overloads on boto3.client/resource. Services we
+# don't list in additional_dependencies have Unknown return types in the
+# overload set, which trips reportUnknown* even when we never call those
+# services. Downgrade these three; everything else stays strict.
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+
+# boto3 itself ships no inline type info; only boto3-stubs (dev-only) provides
+# types. Don't fail builds because runtime lacks stubs.
+reportMissingTypeStubs = "warning"
+
+# Keep these strict.
+reportUnnecessaryTypeIgnoreComment = "warning"
+reportPrivateUsage = "warning"
+reportUnusedFunction = "error"
+reportUnusedImport = "error"
+reportUnusedVariable = "error"

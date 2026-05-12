@@ -1,0 +1,14 @@
+# crate-ci/typos config. Project-specific allowlist.
+
+[default.extend-words]
+# AWS / CodeArtifact / Terraform terminology that typos otherwise flags.
+ALLOW = "ALLOW"
+BLOCK = "BLOCK"
+
+[files]
+extend-exclude = [
+  ".terraform/",
+  "*.tfstate",
+  "*.tfstate.*",
+  ".terraform.lock.hcl",
+]
