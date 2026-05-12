@@ -56,19 +56,24 @@ module "quarantine" {
   name        = "platform-pkg-quarantine"
   domain_name = "platform"
 
+  # CodeArtifact allows at most one external connection per repository, so each
+  # public source gets its own staging repo. prod upstreams all of them.
   repositories = {
-    staging = {
-      external_connections = ["public:npmjs", "public:pypi"]
+    staging-npm = {
+      external_connection = "public:npmjs"
+    }
+    staging-pypi = {
+      external_connection = "public:pypi"
     }
     prod = {
-      upstreams = ["staging"]
+      upstreams = ["staging-npm", "staging-pypi"]
     }
   }
 
   pipeline = {
-    source_repository = "staging"
-    target_repository = "prod"
-    cooldown          = "PT24H"
+    source_repositories = ["staging-npm", "staging-pypi"]
+    target_repository   = "prod"
+    cooldown            = "PT24H"
     scanner = {
       type              = "inspector"
       block_on_severity = ["HIGH", "CRITICAL"]

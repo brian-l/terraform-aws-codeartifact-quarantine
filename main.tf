@@ -27,6 +27,7 @@ module "pipeline" {
   cooldown = var.pipeline.cooldown
   scanner  = var.pipeline.scanner
   approval = var.pipeline.approval
+  logging  = var.pipeline.logging
 
   pre_promote_lambda_arn  = var.pre_promote_lambda_arn
   post_promote_lambda_arn = var.post_promote_lambda_arn

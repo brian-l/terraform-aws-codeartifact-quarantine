@@ -84,6 +84,16 @@ variable "pipeline" {
       timeout          = optional(string, "P14D")
       notification_arn = string
     })
+    logging = optional(object({
+      # Step Functions log level: OFF | ALL | ERROR | FATAL. Default ERROR keeps
+      # log volume and information disclosure minimal (only failure transitions
+      # are logged). Set ALL only when you need forensic execution traces.
+      level = optional(string, "ERROR")
+      # Include full state input/output in CloudWatch Logs. WARNING: when true,
+      # logs contain Inspector findings (CVE IDs and details), package names,
+      # and (during human-approval states) the SFN task token. Default false.
+      include_execution_data = optional(bool, false)
+    }), {})
   })
 
   validation {
@@ -109,6 +119,11 @@ variable "pipeline" {
   validation {
     condition     = contains(["always", "findings", "never"], var.pipeline.approval.required_when)
     error_message = "pipeline.approval.required_when must be 'always', 'findings', or 'never'."
+  }
+
+  validation {
+    condition     = contains(["OFF", "ALL", "ERROR", "FATAL"], var.pipeline.logging.level)
+    error_message = "pipeline.logging.level must be one of OFF, ALL, ERROR, FATAL."
   }
 }
 

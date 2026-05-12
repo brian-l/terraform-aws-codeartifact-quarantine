@@ -53,6 +53,14 @@ variable "approval" {
   })
 }
 
+variable "logging" {
+  type = object({
+    level                  = optional(string, "ERROR")
+    include_execution_data = optional(bool, false)
+  })
+  default = {}
+}
+
 variable "pre_promote_lambda_arn" {
   type    = string
   default = null

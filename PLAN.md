@@ -191,26 +191,28 @@ variable "domain_kms_key_arn" {
 
 variable "repositories" {
   description = <<-EOT
-    Map of CodeArtifact repositories to create. The keys 'staging' and 'prod' are required.
-    Add 'internal' (or any other key) for additional repos.
+    Map of CodeArtifact repositories to create. A 'prod' key is required (the
+    consumer-facing repository). One or more source/staging repositories must
+    be listed in pipeline.source_repositories. CodeArtifact allows at most one
+    external connection per repository.
   EOT
   type = map(object({
-    description          = optional(string)
-    external_connections = optional(list(string), [])
-    upstreams            = optional(list(string), [])
+    description         = optional(string)
+    external_connection = optional(string)
+    upstreams           = optional(list(string), [])
   }))
   validation {
-    condition     = contains(keys(var.repositories), "staging") && contains(keys(var.repositories), "prod")
-    error_message = "repositories must include both 'staging' and 'prod' keys."
+    condition     = contains(keys(var.repositories), "prod")
+    error_message = "repositories must include a 'prod' key."
   }
 }
 
 variable "pipeline" {
   description = "Quarantine pipeline configuration."
   type = object({
-    source_repository = string                   # default "staging"
-    target_repository = string                   # default "prod"
-    cooldown          = string                   # ISO-8601 duration, e.g. "PT24H"
+    source_repositories = list(string)           # keys from var.repositories
+    target_repository   = string                 # key from var.repositories
+    cooldown            = string                 # ISO-8601 duration, e.g. "PT24H"
     scanner = object({
       type              = string                 # "inspector" | "lambda" | "none"
       block_on_severity = optional(list(string), ["HIGH", "CRITICAL"])
@@ -221,6 +223,10 @@ variable "pipeline" {
       timeout          = optional(string, "P14D")
       notification_arn = string                  # SNS topic for approvals + alerts
     })
+    logging = optional(object({
+      level                  = optional(string, "ERROR")  # OFF | ALL | ERROR | FATAL
+      include_execution_data = optional(bool, false)
+    }), {})
   })
 }
 
@@ -354,7 +360,7 @@ output "notification_topic_arn"   { ... }  # consumer-provided pass-through
 
 ### Milestone 5 — Examples + tests (Day 5)
 
-- [ ] `examples/simple/` — staging + prod only, no internal repo, no approval
+- [ ] `examples/simple/` — staging-npm + staging-pypi + prod, approval on findings
 - [ ] `examples/with-internal-packages/` — adds internal-repo, package groups for `pypi:myorg-*` and `npm:@myorg/*`
 - [ ] `examples/multi-account/` — `consumer_principals` cross-account read
 - [ ] `examples/custom-scanner/` — pluggable scanner with stub Lambda
@@ -389,7 +395,7 @@ output "notification_topic_arn"   { ... }  # consumer-provided pass-through
    - **Tentative:** SNS-only in core module; reference Slack bot lives in a sibling repo or `examples/`.
 
 3. **Multi-format scanner ergonomics.** Inspector v2 supports npm, PyPI, Maven, NuGet, Gem. We should not artificially limit; let consumers configure formats.
-   - The `repositories[*].external_connections` list controls what flows in. Scanner is format-agnostic if it just calls Inspector.
+   - Each `repositories[*].external_connection` declares one upstream public source per staging repo. Scanner is format-agnostic if it just calls Inspector.
 
 4. **State machine versioning.** When we change the SFN definition, in-flight executions still use the old version. Document that upgrades require either draining or accepting the mismatch.
 
@@ -429,7 +435,7 @@ output "notification_topic_arn"   { ... }  # consumer-provided pass-through
 
 To stay small and honest:
 
-- We don't try to abstract over which **package formats** are configured. Consumers list them explicitly in `repositories[*].external_connections`.
+- We don't try to abstract over which **package formats** are configured. Consumers add a separate staging repo per format with an explicit `external_connection`.
 - We don't try to ship a "default policy" beyond "block on HIGH/CRITICAL Inspector findings." Consumers tune `pipeline.scanner.block_on_severity`.
 - We don't try to enforce naming conventions for the resources we create beyond `var.name` prefixing. Customization beyond that requires a fork.
 
