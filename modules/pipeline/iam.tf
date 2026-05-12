@@ -1,6 +1,28 @@
 # ---------------------------------------------------------------------------
 # IAM roles for each Lambda. Least-privilege per function.
+#
+# CodeArtifact's IAM model splits across three resource types:
+#   - Domain:     arn:<part>:codeartifact:<region>:<account>:domain/<domain>
+#   - Repository: arn:<part>:codeartifact:<region>:<account>:repository/<domain>/<repo>
+#   - Package:    arn:<part>:codeartifact:<region>:<account>:package/<domain>/<repo>/<fmt>/<ns>/<name>
+#
+# Most "read/write package" actions (DescribePackageVersion, CopyPackageVersions,
+# PublishPackageVersion, ...) require the *package* ARN. Repository ARNs only
+# cover repo-level actions (ReadFromRepository, GetRepositoryEndpoint).
+# `GetAuthorizationToken` is *domain*-scoped. Earlier iterations of this module
+# scoped only to repo ARNs and silently failed at runtime; the locals below
+# derive the package wildcards and domain ARN from the inputs we already have.
 # ---------------------------------------------------------------------------
+
+locals {
+  # arn:...:repository/<domain>/<repo> → arn:...:package/<domain>/<repo>/*
+  source_package_arn_wildcards = [
+    for arn in var.source_repo_arns : "${replace(arn, ":repository/", ":package/")}/*"
+  ]
+  target_package_arn_wildcard = "${replace(var.target_repo_arn, ":repository/", ":package/")}/*"
+
+  domain_arn = "arn:${data.aws_partition.current.partition}:codeartifact:${data.aws_region.current.region}:${var.domain_owner}:domain/${var.domain_name}"
+}
 
 data "aws_iam_policy_document" "lambda_assume" {
   statement {
@@ -58,29 +80,26 @@ resource "aws_iam_role" "scan" {
 
 data "aws_iam_policy_document" "scan" {
   statement {
+    sid = "InspectorFindings"
     actions = [
       "inspector2:ListFindings",
       "inspector2:BatchGetFindingDetails",
     ]
     resources = ["*"]
   }
-  statement {
-    actions = [
-      "codeartifact:DescribePackageVersion",
-      "codeartifact:GetPackageVersionAsset",
-    ]
-    resources = flatten([
-      for arn in var.source_repo_arns : [arn, "${arn}/*"]
-    ])
-  }
+
+  # Optional: when scanner.type = "lambda", invoke the consumer-provided scanner.
   dynamic "statement" {
     for_each = var.scanner.type == "lambda" && var.scanner.lambda_arn != null ? [1] : []
     content {
+      sid       = "InvokeCustomScanner"
       actions   = ["lambda:InvokeFunction"]
       resources = [var.scanner.lambda_arn]
     }
   }
+
   statement {
+    sid       = "Logs"
     actions   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
     resources = ["*"]
   }
@@ -100,22 +119,48 @@ resource "aws_iam_role" "promote" {
 }
 
 data "aws_iam_policy_document" "promote" {
+  # Domain-level: getting an auth token. CopyPackageVersions internally needs this.
   statement {
+    sid       = "DomainAuth"
+    actions   = ["codeartifact:GetAuthorizationToken"]
+    resources = [local.domain_arn]
+  }
+
+  # Repository-level: reading from source, describing endpoints, etc.
+  statement {
+    sid = "RepositoryRead"
+    actions = [
+      "codeartifact:ReadFromRepository",
+      "codeartifact:GetRepositoryEndpoint",
+      "codeartifact:DescribeRepository",
+    ]
+    resources = concat(var.source_repo_arns, [var.target_repo_arn])
+  }
+
+  # Package-level: the actual copy and the metadata calls it triggers.
+  # CopyPackageVersions requires the action on BOTH source and destination
+  # packages; we list them together.
+  statement {
+    sid = "PackageReadWrite"
     actions = [
       "codeartifact:CopyPackageVersions",
       "codeartifact:DescribePackageVersion",
-      "codeartifact:GetAuthorizationToken",
-      "codeartifact:GetRepositoryEndpoint",
-      "codeartifact:ReadFromRepository",
+      "codeartifact:GetPackageVersionAsset",
+      "codeartifact:GetPackageVersionReadme",
       "codeartifact:PublishPackageVersion",
       "codeartifact:PutPackageMetadata",
+      "codeartifact:ListPackageVersions",
+      "codeartifact:ListPackageVersionAssets",
     ]
     resources = concat(
-      flatten([for arn in var.source_repo_arns : [arn, "${arn}/*"]]),
-      [var.target_repo_arn, "${var.target_repo_arn}/*"],
+      local.source_package_arn_wildcards,
+      [local.target_package_arn_wildcard],
     )
   }
+
+  # Service-linked bearer token used by the boto3 CodeArtifact client.
   statement {
+    sid       = "ServiceBearerToken"
     actions   = ["sts:GetServiceBearerToken"]
     resources = ["*"]
     condition {
@@ -124,11 +169,16 @@ data "aws_iam_policy_document" "promote" {
       values   = ["codeartifact.amazonaws.com"]
     }
   }
+
+  # Domain KMS key for asset encryption/decryption.
   statement {
+    sid       = "DomainKMS"
     actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
     resources = [var.domain_kms_key_arn]
   }
+
   statement {
+    sid       = "Logs"
     actions   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
     resources = ["*"]
   }
@@ -177,16 +227,27 @@ resource "aws_iam_role" "expedite" {
 
 data "aws_iam_policy_document" "expedite" {
   statement {
+    sid       = "StartQuarantine"
     actions   = ["states:StartExecution"]
     resources = [aws_sfn_state_machine.quarantine.arn]
   }
+
+  # The expedite handler validates the named version exists in the source repo
+  # before kicking off the SFN, so it needs DescribePackageVersion on packages.
   statement {
-    actions = ["codeartifact:DescribePackageVersion"]
-    resources = flatten([
-      for arn in var.source_repo_arns : [arn, "${arn}/*"]
-    ])
+    sid = "VerifyPackageExists"
+    actions = [
+      "codeartifact:DescribePackageVersion",
+      "codeartifact:ReadFromRepository",
+    ]
+    resources = concat(
+      local.source_package_arn_wildcards,
+      var.source_repo_arns,
+    )
   }
+
   statement {
+    sid       = "Logs"
     actions   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
     resources = ["*"]
   }
