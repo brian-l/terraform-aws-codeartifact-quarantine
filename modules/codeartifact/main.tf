@@ -45,13 +45,20 @@ resource "aws_codeartifact_domain" "this" {
 # ---------------------------------------------------------------------------
 # Repositories
 #
-# Two-pass creation:
-#   1. Create every repo with its external_connections (no upstreams yet).
-#   2. Update each repo to set its upstreams (which reference other repos in this map).
+# The upstream block references the upstream repository by *self-reference* to
+# another instance of this for_each resource: `aws_codeartifact_repository.
+# this[upstream.value].repository`. That reference is what gives Terraform a
+# graph edge between the dependent repo (e.g. prod) and its upstreams
+# (e.g. staging-npm, staging-pypi).
 #
-# Terraform's aws_codeartifact_repository resource accepts both fields directly,
-# so we can do this in one pass as long as we depend_on the full set. The "for_each"
-# guarantees all repos exist before any upstream wiring is attempted.
+# Without the self-reference, the `repository_name` would be a plain string
+# interpolation Terraform can't trace, so it would create everything in
+# parallel — and CodeArtifact rejects creation of a repo whose upstream
+# doesn't yet exist.
+#
+# Terraform allows for_each self-references as long as the dependency graph is
+# acyclic. Don't introduce cycles in var.repositories (A upstreams B AND B
+# upstreams A).
 # ---------------------------------------------------------------------------
 
 resource "aws_codeartifact_repository" "this" {
@@ -74,13 +81,14 @@ resource "aws_codeartifact_repository" "this" {
   dynamic "upstream" {
     for_each = each.value.upstreams
     content {
-      repository_name = "${var.name}-${upstream.value}"
+      # Self-reference into the same for_each resource. Terraform reads this as
+      # "this instance depends on instance[upstream.value]" and orders creates.
+      repository_name = aws_codeartifact_repository.this[upstream.value].repository
     }
   }
 
   tags = var.tags
 
-  # Ensure all repos exist before any upstream wiring is evaluated.
   depends_on = [aws_codeartifact_domain.this]
 }
 
