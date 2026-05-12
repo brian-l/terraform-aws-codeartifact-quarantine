@@ -111,8 +111,10 @@ resource "aws_lambda_function" "scan" {
 
   environment {
     variables = merge(local.common_env, {
-      SCANNER_TYPE       = var.scanner.type
-      SCANNER_LAMBDA_ARN = coalesce(var.scanner.lambda_arn, "")
+      SCANNER_TYPE = var.scanner.type
+      # coalesce() errors when ALL args are null/empty; use a conditional instead
+      # so scanner.lambda_arn = null (the default for "inspector" mode) is fine.
+      SCANNER_LAMBDA_ARN = var.scanner.lambda_arn == null ? "" : var.scanner.lambda_arn
       BLOCK_ON_SEVERITY  = join(",", var.scanner.block_on_severity)
     })
   }
