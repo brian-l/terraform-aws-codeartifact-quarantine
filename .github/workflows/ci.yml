@@ -56,6 +56,14 @@ jobs:
         with:
           version: v0.70.0
 
+      # Pre-warm trivy's misconfig check bundle so the per-directory hook
+      # invocations don't race to populate ~/.cache/trivy/policy/. Without this,
+      # concurrent extracts intermittently surface as
+      # "failed to download checks bundle ... no such file or directory" and
+      # trivy silently falls back to embedded checks.
+      - name: Pre-warm trivy check bundle
+        run: trivy config /tmp >/dev/null
+
       - name: Install terraform-docs
         env:
           TFDOCS_VERSION: v0.20.0

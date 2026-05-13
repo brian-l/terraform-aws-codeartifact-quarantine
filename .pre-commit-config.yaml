@@ -55,11 +55,19 @@ repos:
           - --args=--call-module-type=all
 
       # Trivy: security scanner. Catches issues like unencrypted resources, public S3, etc.
+      #
+      # --skip-check-update: the hook fires once per Terraform directory, and
+      # pre-commit may run those calls concurrently. Without this flag, parallel
+      # trivy processes race to populate ~/.cache/trivy/policy/ and one
+      # intermittently reads a half-written tree, then falls back to embedded
+      # checks. CI pre-warms the bundle so this flag is safe; locally, run
+      # `trivy config /tmp` once after a `trivy clean` if checks look stale.
       - id: terraform_trivy
         args:
           - --args=--severity HIGH,CRITICAL
           - --args=--skip-dirs="**/.terraform"
           - --args=--skip-dirs="**/examples"
+          - --args=--skip-check-update
 
       # Auto-generate input/output tables in module READMEs.
       - id: terraform_docs
