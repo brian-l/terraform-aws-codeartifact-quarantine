@@ -32,10 +32,6 @@ module "pipeline" {
   approval = var.pipeline.approval
   logging  = var.pipeline.logging
 
-  pre_promote_lambda_arn  = var.pre_promote_lambda_arn
-  post_promote_lambda_arn = var.post_promote_lambda_arn
-
-  policy_storage     = var.policy_storage
   log_retention_days = var.log_retention_days
 
   tags = local.tags
@@ -44,6 +40,4 @@ module "pipeline" {
 module "inspector" {
   source = "./modules/inspector"
   count  = var.enable_inspector ? 1 : 0
-
-  tags = local.tags
 }

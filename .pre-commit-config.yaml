@@ -19,7 +19,7 @@
 repos:
   # ── Generic hygiene ──────────────────────────────────────────────────────
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b  # v5.0.0
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b # v5.0.0
     hooks:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
@@ -37,7 +37,7 @@ repos:
 
   # ── Terraform ────────────────────────────────────────────────────────────
   - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: e0322737dccad136b751416f9e45d9980fe18435  # v1.96.2
+    rev: e0322737dccad136b751416f9e45d9980fe18435 # v1.96.2
     hooks:
       # Canonical formatting. Fails if anything is unformatted.
       - id: terraform_fmt
@@ -49,28 +49,36 @@ repos:
           - --hook-config=--retry-once-with-cleanup=true
 
       # tflint: lints for unused vars, deprecated syntax, aws provider-specific issues.
-      # - id: terraform_tflint
-      #   args:
-      #     - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
-      #     - --args=--call-module-type=all
+      - id: terraform_tflint
+        args:
+          - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
+          - --args=--call-module-type=all
 
       # Trivy: security scanner. Catches issues like unencrypted resources, public S3, etc.
-      # - id: terraform_trivy
-      #   args:
-      #     - --args=--severity HIGH,CRITICAL
-      #     - --args=--skip-dirs="**/.terraform"
-      #     - --args=--skip-dirs="**/examples"
+      #
+      # --skip-check-update: the hook fires once per Terraform directory, and
+      # pre-commit may run those calls concurrently. Without this flag, parallel
+      # trivy processes race to populate ~/.cache/trivy/policy/ and one
+      # intermittently reads a half-written tree, then falls back to embedded
+      # checks. CI pre-warms the bundle so this flag is safe; locally, run
+      # `trivy config /tmp` once after a `trivy clean` if checks look stale.
+      - id: terraform_trivy
+        args:
+          - --args=--severity HIGH,CRITICAL
+          - --args=--skip-dirs="**/.terraform"
+          - --args=--skip-dirs="**/examples"
+          - --args=--skip-check-update
 
       # Auto-generate input/output tables in module READMEs.
-      # - id: terraform_docs
-      #   args:
-      #     - --hook-config=--path-to-file=README.md
-      #     - --hook-config=--add-to-existing-file=true
-      #     - --hook-config=--create-file-if-not-exist=false
+      - id: terraform_docs
+        args:
+          - --hook-config=--path-to-file=README.md
+          - --hook-config=--add-to-existing-file=true
+          - --hook-config=--create-file-if-not-exist=false
 
   # ── Python (Lambda handlers) ─────────────────────────────────────────────
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: f0b5944bef86f50d875305821a0ab0d8c601e465  # v0.8.4
+    rev: f0b5944bef86f50d875305821a0ab0d8c601e465 # v0.8.4
     hooks:
       - id: ruff
         files: ^lambda/
@@ -79,7 +87,7 @@ repos:
         files: ^lambda/
 
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: d7508e5425d3d02761d70dab1f9a2086573af429  # v1.1.409
+    rev: d7508e5425d3d02761d70dab1f9a2086573af429 # v1.1.409
     hooks:
       - id: pyright
         files: ^lambda/
@@ -91,7 +99,7 @@ repos:
 
   # ── Spell-check long-form prose (READMEs, CHANGELOG, SECURITY, ...) ──────
   - repo: https://github.com/crate-ci/typos
-    rev: 9d890159570d5018df91fedfa40b4730cd4a81b1  # v1.28.4
+    rev: 9d890159570d5018df91fedfa40b4730cd4a81b1 # v1.28.4
     hooks:
       - id: typos
         # Don't fail on typos in vendored output; only project-authored content.

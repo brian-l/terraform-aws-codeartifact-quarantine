@@ -1,17 +1,21 @@
 variable "name" {
-  type = string
+  description = "Prefix applied to created resources (consumer IAM policy, etc.)."
+  type        = string
 }
 
 variable "domain_name" {
-  type = string
+  description = "CodeArtifact domain name. Must be unique within the AWS account."
+  type        = string
 }
 
 variable "domain_kms_key_arn" {
-  type    = string
-  default = null
+  description = "KMS key ARN for the CodeArtifact domain. If null, a customer-managed key is created."
+  type        = string
+  default     = null
 }
 
 variable "repositories" {
+  description = "Map of CodeArtifact repositories to create. Keys are repository names; values define description, optional external_connection, and upstream repository keys."
   type = map(object({
     description         = optional(string)
     external_connection = optional(string)
@@ -20,6 +24,7 @@ variable "repositories" {
 }
 
 variable "package_groups" {
+  description = "Package group origin control rules. Each entry binds a repository + pattern with publish/upstream permissions."
   type = list(object({
     repository = string
     pattern    = string
@@ -30,8 +35,9 @@ variable "package_groups" {
 }
 
 variable "consumer_principals" {
-  type    = list(string)
-  default = []
+  description = "List of AWS principal ARNs allowed to read from the prod repository cross-account."
+  type        = list(string)
+  default     = []
 }
 
 variable "create_consumer_policy" {
@@ -53,6 +59,7 @@ variable "consumer_policy_name" {
 }
 
 variable "tags" {
-  type    = map(string)
-  default = {}
+  description = "Tags applied to every taggable resource the module creates."
+  type        = map(string)
+  default     = {}
 }

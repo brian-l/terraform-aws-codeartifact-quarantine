@@ -1,9 +1,11 @@
 variable "name" {
-  type = string
+  description = "Prefix applied to all pipeline resources (Lambdas, state machine, DynamoDB, SQS, log groups)."
+  type        = string
 }
 
 variable "domain_name" {
-  type = string
+  description = "CodeArtifact domain name the pipeline operates against."
+  type        = string
 }
 
 variable "domain_owner" {
@@ -12,23 +14,28 @@ variable "domain_owner" {
 }
 
 variable "domain_kms_key_arn" {
-  type = string
+  description = "KMS key ARN encrypting the CodeArtifact domain. Granted to pipeline Lambdas for decrypt."
+  type        = string
 }
 
 variable "source_repo_names" {
-  type = list(string)
+  description = "CodeArtifact repository names EventBridge ingestion fires on (the staging/quarantine repos)."
+  type        = list(string)
 }
 
 variable "source_repo_arns" {
-  type = list(string)
+  description = "ARNs of the source repositories, used for IAM scoping."
+  type        = list(string)
 }
 
 variable "target_repo_name" {
-  type = string
+  description = "CodeArtifact repository name versions are promoted into (typically 'prod')."
+  type        = string
 }
 
 variable "target_repo_arn" {
-  type = string
+  description = "ARN of the target repository, used for IAM scoping."
+  type        = string
 }
 
 variable "cooldown" {
@@ -38,6 +45,7 @@ variable "cooldown" {
 }
 
 variable "scanner" {
+  description = "Scanner configuration: type ('inspector' | 'lambda' | 'none'), severities that block promotion, and the custom Lambda ARN when type is 'lambda'."
   type = object({
     type              = string
     block_on_severity = optional(list(string), ["HIGH", "CRITICAL"])
@@ -46,6 +54,7 @@ variable "scanner" {
 }
 
 variable "approval" {
+  description = "Human-approval configuration: required_when ('always' | 'findings' | 'never'), task-token timeout, and optional pre-existing SNS topic ARN."
   type = object({
     required_when    = string
     timeout          = optional(string, "P14D")
@@ -54,6 +63,7 @@ variable "approval" {
 }
 
 variable "logging" {
+  description = "Step Functions logging configuration: level (OFF/ALL/ERROR/FATAL) and whether to include full state input/output."
   type = object({
     level                  = optional(string, "ERROR")
     include_execution_data = optional(bool, false)
@@ -61,27 +71,14 @@ variable "logging" {
   default = {}
 }
 
-variable "pre_promote_lambda_arn" {
-  type    = string
-  default = null
-}
-
-variable "post_promote_lambda_arn" {
-  type    = string
-  default = null
-}
-
-variable "policy_storage" {
-  type    = string
-  default = "env"
-}
-
 variable "log_retention_days" {
-  type    = number
-  default = 30
+  description = "CloudWatch Logs retention (days) for all Lambda log groups in the pipeline."
+  type        = number
+  default     = 30
 }
 
 variable "tags" {
-  type    = map(string)
-  default = {}
+  description = "Tags applied to every taggable resource the module creates."
+  type        = map(string)
+  default     = {}
 }
