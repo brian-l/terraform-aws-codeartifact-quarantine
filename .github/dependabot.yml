@@ -1,0 +1,48 @@
+# Dependabot keeps the module's own supply chain fresh.
+#
+# Each ecosystem opens PRs against this repo's defaults branch on a weekly
+# schedule. Grouped where possible to avoid PR sprawl.
+
+version: 2
+updates:
+  # GitHub Actions used in .github/workflows. Dependabot rewrites SHA pins +
+  # the # vX.Y.Z comment to keep them aligned.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # Terraform provider versions in versions.tf + each submodule.
+  # Note: this only opens PRs for version-constraint changes, not for our
+  # pin choices. Renovate would understand sub-versions better but Dependabot
+  # is the GitHub-native option.
+  - package-ecosystem: terraform
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      terraform-providers:
+        patterns: ["*"]
+
+  - package-ecosystem: terraform
+    directory: /modules/codeartifact
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: terraform
+    directory: /modules/pipeline
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: terraform
+    directory: /modules/inspector
+    schedule:
+      interval: weekly
+      day: monday

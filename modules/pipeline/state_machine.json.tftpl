@@ -1,0 +1,215 @@
+{
+  "Comment": "CodeArtifact quarantine pipeline. Wait → Scan → (optional approval) → Promote → Audit.",
+  "StartAt": "CheckSkipCooldown",
+  "States": {
+    "CheckSkipCooldown": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.skipCooldown",
+          "BooleanEquals": true,
+          "Next": "Scan"
+        }
+      ],
+      "Default": "Cooldown"
+    },
+
+    "Cooldown": {
+      "Type": "Wait",
+      "Seconds": ${cooldown_seconds},
+      "Next": "Scan",
+      "Comment": "Configured via var.pipeline.cooldown (ISO-8601). Converted to integer Seconds by the module — Step Functions Wait does not accept Duration."
+    },
+
+    "Scan": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${scan_lambda_arn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "decision.$": "$.Payload.decision",
+        "findings.$": "$.Payload.findings"
+      },
+      "ResultPath": "$.scanResult",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "RecordScanFailure",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "EvaluateDecision"
+    },
+
+    "EvaluateDecision": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.scanResult.decision",
+          "StringEquals": "blocked",
+          "Next": "NotifyBlocked"
+        },
+        {
+          "And": [
+            { "Variable": "$.scanResult.decision", "StringEquals": "findings" },
+            { "Or": [
+              { "Variable": "$$.Execution.Input.approvalMode", "StringEquals": "always" },
+              { "Variable": "$$.Execution.Input.approvalMode", "StringEquals": "findings" }
+            ]}
+          ],
+          "Next": "RequestApproval"
+        }
+      ],
+      "Default": "Promote"
+    },
+
+    "RequestApproval": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish.waitForTaskToken",
+      "Parameters": {
+        "TopicArn": "${notification_arn}",
+        "Subject": "CodeArtifact quarantine: approval requested",
+        "Message": {
+          "type": "approval-request",
+          "package.$": "$.detail.packageName",
+          "version.$": "$.detail.packageVersion",
+          "format.$": "$.detail.packageFormat",
+          "findings.$": "$.scanResult.findings",
+          "taskToken.$": "$$.Task.Token"
+        }
+      },
+      "TimeoutSecondsPath": "$.approvalTimeoutSeconds",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.Timeout"],
+          "Next": "NotifyTimeout",
+          "ResultPath": "$.error"
+        },
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "Next": "NotifyRejected",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "Promote"
+    },
+
+    "Promote": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${promote_lambda_arn}",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$.promoteResult",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "RecordPromoteFailure",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "AuditPromoted"
+    },
+
+    "NotifyBlocked": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${notification_arn}",
+        "Subject": "CodeArtifact quarantine: BLOCKED",
+        "Message.$": "$"
+      },
+      "ResultPath": "$.notifyResult",
+      "Next": "AuditBlocked"
+    },
+
+    "NotifyTimeout": {
+      "Type": "Pass",
+      "Parameters": { "decision": "approval-timeout" },
+      "ResultPath": "$.outcome",
+      "Next": "AuditFailure"
+    },
+
+    "NotifyRejected": {
+      "Type": "Pass",
+      "Parameters": { "decision": "rejected" },
+      "ResultPath": "$.outcome",
+      "Next": "AuditFailure"
+    },
+
+    "AuditPromoted": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${audit_lambda_arn}",
+        "Payload": {
+          "decision": "promoted",
+          "execution.$": "$$.Execution.Name",
+          "input.$": "$"
+        }
+      },
+      "End": true
+    },
+
+    "AuditBlocked": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${audit_lambda_arn}",
+        "Payload": {
+          "decision": "blocked",
+          "execution.$": "$$.Execution.Name",
+          "input.$": "$"
+        }
+      },
+      "End": true
+    },
+
+    "AuditFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${audit_lambda_arn}",
+        "Payload": {
+          "decision.$": "$.outcome.decision",
+          "execution.$": "$$.Execution.Name",
+          "input.$": "$"
+        }
+      },
+      "End": true
+    },
+
+    "RecordScanFailure": {
+      "Type": "Pass",
+      "Parameters": { "decision": "scan-error" },
+      "ResultPath": "$.outcome",
+      "Next": "AuditFailure"
+    },
+
+    "RecordPromoteFailure": {
+      "Type": "Pass",
+      "Parameters": { "decision": "promote-error" },
+      "ResultPath": "$.outcome",
+      "Next": "AuditFailure"
+    }
+  }
+}

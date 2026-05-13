@@ -1,0 +1,85 @@
+# Release workflow for terraform-aws-codeartifact-quarantine.
+#
+# Triggered on push of a vX.Y.Z tag. Creates a GitHub Release with:
+#   1. A source tarball of the tagged commit (deterministic, via `git archive`)
+#   2. A SLSA build provenance attestation tying that tarball to this workflow
+#      run, signed by Sigstore via OIDC
+#
+# Verifying a release:
+#   gh attestation verify <tarball> --owner brian-l
+#
+# This gives consumers cryptographic evidence that the tarball was built from
+# this repo at this commit by this workflow — not by an attacker who pushed
+# a malicious release tarball directly via the GitHub UI.
+#
+# Workflow-injection safety: GITHUB_REF_NAME is accessed via env var (not
+# interpolated into the run: block), which is the canonical safe pattern.
+# Only push-access holders can create v*.*.* tags, so ref_name is trusted,
+# but the env-var pattern is defense in depth.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Release ${{ github.ref_name }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write       # create GitHub Release
+      id-token: write       # request OIDC token for Sigstore
+      attestations: write   # write the attestation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0    # need full history for `git archive` of the tag
+
+      - name: Build source tarball
+        id: tarball
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${REF_NAME#v}"
+          name="terraform-aws-codeartifact-quarantine-${version}"
+          # `git archive` reflects the exact tagged tree — no working-copy junk.
+          git archive --format=tar.gz --prefix="${name}/" -o "${name}.tar.gz" "${REF_NAME}"
+          sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256"
+          {
+            echo "artifact=${name}.tar.gz"
+            echo "checksum=${name}.tar.gz.sha256"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@520d128f165991a6c774bcb264f323e3d70747f4  # v2.2.0
+        with:
+          subject-path: ${{ steps.tarball.outputs.artifact }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda  # v2.2.1
+        with:
+          generate_release_notes: true
+          files: |
+            ${{ steps.tarball.outputs.artifact }}
+            ${{ steps.tarball.outputs.checksum }}
+          body: |
+            ## Verifying this release
+
+            ```bash
+            # Verify the SLSA build provenance attestation:
+            gh attestation verify ${{ steps.tarball.outputs.artifact }} --owner brian-l
+
+            # Verify the checksum:
+            sha256sum -c ${{ steps.tarball.outputs.checksum }}
+
+            # Verify the signed tag:
+            git tag -v ${{ github.ref_name }}
+            ```

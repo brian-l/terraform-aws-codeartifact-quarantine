@@ -1,0 +1,106 @@
+# CI for terraform-aws-codeartifact-quarantine.
+#
+# Runs on every PR + push to main. Every Action is SHA-pinned (not tag-pinned)
+# to defend against tag-hijack attacks. The `# vX.Y.Z` comment is human-only;
+# the SHA is authoritative.
+#
+# Workflow-injection safety: this workflow does not interpolate any user-
+# controllable strings (PR titles, commit messages, issue bodies, head refs)
+# into shell `run:` blocks. All `run:` content is static.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre-commit:
+    name: pre-commit
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd  # v3.1.2
+        with:
+          terraform_version: "1.10.3"
+          terraform_wrapper: false
+
+      - name: Run pre-commit
+        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd  # v3.0.1
+
+  example-plan:
+    name: example/simple terraform plan
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd  # v3.1.2
+        with:
+          terraform_version: "1.10.3"
+          terraform_wrapper: false
+
+      - name: terraform init
+        working-directory: examples/simple
+        run: terraform init -backend=false -input=false
+
+      - name: terraform validate
+        working-directory: examples/simple
+        run: terraform validate
+
+  lambda-tests:
+    name: Lambda unit tests
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        # boto3 and boto3-stubs versions match those exercised by pre-commit's
+        # pyright hook so test failures mirror production-time type errors.
+        # Install into a uv-managed venv: the runner's system Python is
+        # PEP 668-protected so `uv pip install --system` is rejected.
+        run: |
+          uv venv --python 3.12
+          uv pip install \
+            'boto3==1.43.6' \
+            'boto3-stubs[essential,codeartifact,inspector2,lambda,sns,sqs,stepfunctions,dynamodb]==1.43.6' \
+            'pytest==9.0.3' \
+            'pytest-cov==7.1.0' \
+            'pytest-mock==3.15.1'
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Run pytest
+        run: pytest

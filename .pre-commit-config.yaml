@@ -1,0 +1,98 @@
+# Pre-commit hooks for terraform-aws-codeartifact-quarantine.
+#
+# Install:
+#   uv tool install pre-commit       # or `pip install pre-commit` if uv isn't available
+#   pre-commit install
+#
+# Run on all files:
+#   pre-commit run --all-files
+#
+# Supply-chain note: hook revs are pinned to full 40-char commit SHAs, not tags.
+# Tags can be force-moved by the maintainer (or an attacker who compromises the
+# maintainer's account); commit SHAs cannot. The `# vX.Y.Z` comment after each
+# rev is for human readability only.
+#
+# To update: run `pre-commit autoupdate --freeze`, which resolves the latest
+# tagged release to a commit SHA and writes it back. Review the diff before
+# committing — verify the new SHA on GitHub Releases, not just the tag name.
+
+repos:
+  # ── Generic hygiene ──────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b  # v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-yaml
+      - id: check-json
+        # state_machine.json.tftpl is a template; skip it (Terraform parses it).
+        exclude: \.tftpl$
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: detect-private-key
+
+  # ── Terraform ────────────────────────────────────────────────────────────
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: e0322737dccad136b751416f9e45d9980fe18435  # v1.96.2
+    hooks:
+      # Canonical formatting. Fails if anything is unformatted.
+      - id: terraform_fmt
+
+      # Schema + reference validity. Runs `terraform init -backend=false` in each
+      # module dir and `terraform validate`.
+      - id: terraform_validate
+        args:
+          - --hook-config=--retry-once-with-cleanup=true
+
+      # tflint: lints for unused vars, deprecated syntax, aws provider-specific issues.
+      # - id: terraform_tflint
+      #   args:
+      #     - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
+      #     - --args=--call-module-type=all
+
+      # Trivy: security scanner. Catches issues like unencrypted resources, public S3, etc.
+      # - id: terraform_trivy
+      #   args:
+      #     - --args=--severity HIGH,CRITICAL
+      #     - --args=--skip-dirs="**/.terraform"
+      #     - --args=--skip-dirs="**/examples"
+
+      # Auto-generate input/output tables in module READMEs.
+      # - id: terraform_docs
+      #   args:
+      #     - --hook-config=--path-to-file=README.md
+      #     - --hook-config=--add-to-existing-file=true
+      #     - --hook-config=--create-file-if-not-exist=false
+
+  # ── Python (Lambda handlers) ─────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: f0b5944bef86f50d875305821a0ab0d8c601e465  # v0.8.4
+    hooks:
+      - id: ruff
+        files: ^lambda/
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+        files: ^lambda/
+
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: d7508e5425d3d02761d70dab1f9a2086573af429  # v1.1.409
+    hooks:
+      - id: pyright
+        files: ^lambda/
+        # Lambda handlers use boto3 stubs in dev only; not vendored at runtime.
+        # The boto3-stubs version is pinned exact (not >=) to keep the dev
+        # environment reproducible.
+        additional_dependencies:
+          - "boto3-stubs[essential,codeartifact,inspector2,lambda,sns,sqs,stepfunctions,dynamodb]==1.43.6"
+
+  # ── Spell-check long-form prose (READMEs, CHANGELOG, SECURITY, ...) ──────
+  - repo: https://github.com/crate-ci/typos
+    rev: 9d890159570d5018df91fedfa40b4730cd4a81b1  # v1.28.4
+    hooks:
+      - id: typos
+        # Don't fail on typos in vendored output; only project-authored content.
+        exclude: ^(\.terraform/|.*\.tfstate.*|lambda/.*/common/)

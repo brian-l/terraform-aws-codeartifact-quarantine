@@ -1,0 +1,103 @@
+# Contributing
+
+## Local setup
+
+```bash
+# Install pre-commit (one-time) via uv
+uv tool install pre-commit
+
+# Install the hooks into your local repo
+pre-commit install
+
+# Optionally run against all files (slow first time — downloads tflint, trivy, etc.)
+pre-commit run --all-files
+```
+
+After install, every `git commit` will run:
+
+- `terraform fmt`, `validate`, `tflint`, `trivy`, `docs` over the TF files
+- `ruff` + `mypy` over the Lambda handlers
+- Generic hygiene checks (trailing whitespace, large files, merge conflict markers, private keys)
+- `typos` over prose
+
+If a hook auto-fixes (e.g., `terraform fmt`, `ruff --fix`), re-stage and commit again. If a hook reports an unfixable issue, fix the underlying code.
+
+## Build before applying
+
+No build step is required. `archive_file` blocks in `modules/pipeline/lambdas.tf`
+assemble each Lambda's zip from `handler.py` + every file in `lambda/common/`
+directly. Adding or editing any common module is picked up on the next
+`terraform plan`.
+
+## Running the Lambda unit tests
+
+Install [uv](https://docs.astral.sh/uv/) once, then:
+
+```bash
+uv venv
+source .venv/bin/activate    # or: uv run pytest
+uv pip install boto3 'boto3-stubs[essential,codeartifact,inspector2,lambda,sns,sqs,stepfunctions,dynamodb]' pytest pytest-cov pytest-mock
+pytest
+```
+
+Tests use `botocore.stub.Stubber` for AWS API mocking — no live AWS calls,
+no extra dependencies beyond what pyright already needs. CI runs the same
+command via `astral-sh/setup-uv` with a coverage gate (see `.github/workflows/ci.yml`).
+
+The test harness configures env vars that each handler module reads at import
+time (via `common.config.from_env()`); see `lambda/tests/conftest.py`. To test
+configuration changes, monkeypatch the env and use the `fresh_module` fixture
+to re-import the handler under test.
+
+## Module structure
+
+Key invariants:
+
+- The root module composes three submodules: `codeartifact/`, `pipeline/`, `inspector/`.
+- The `codeartifact/` submodule owns all CodeArtifact resources and origin controls.
+- The `pipeline/` submodule owns all EventBridge / SQS / Step Functions / Lambda / DynamoDB.
+- Lambda handlers import only from the stdlib + boto3 (provided by the Lambda runtime).
+- Anything that would force adopters to inherit our opinions (specific naming, Slack integration, package patterns) goes through a variable, not a hardcoded value.
+
+## Adding a new variable
+
+1. Add the variable to root `variables.tf` with `description`, `type`, optional `default`, and `validation` blocks for any non-trivial constraint.
+2. Pass through to the relevant submodule in `main.tf`.
+3. Add the corresponding variable declaration in the submodule's `variables.tf`.
+4. Update the relevant example(s) under `examples/` to demonstrate the new variable when appropriate.
+
+## Releasing
+
+Versions follow semver. Breaking changes to the variable schema bump MAJOR.
+
+1. Update `CHANGELOG.md`.
+2. **Create a GPG- or SSH-signed annotated tag**: `git tag -s vX.Y.Z -m "release vX.Y.Z"`. Unsigned tags will not produce a verifiable release artifact.
+3. Push the tag: `git push origin vX.Y.Z`.
+4. `.github/workflows/release.yml` fires automatically: builds a `git archive` tarball, attests SLSA build provenance via Sigstore (using GitHub Actions OIDC), and creates a GitHub Release with both the artifact and its checksum.
+5. Verify the release end-to-end as a consumer would:
+   ```bash
+   gh attestation verify terraform-aws-codeartifact-quarantine-X.Y.Z.tar.gz --owner brian-l
+   git tag -v vX.Y.Z
+   ```
+
+## Contributor identity
+
+If you're contributing via pull request and don't want to expose a personal email in commit metadata, configure git to use a [GitHub no-reply address](https://github.com/settings/emails):
+
+```bash
+git config user.email "<your-id>+<your-username>@users.noreply.github.com"
+```
+
+CI does not enforce this, but every commit author appears publicly on the repo's commit history once merged.
+
+## Updating pinned dependencies
+
+Pre-commit hook revs are pinned to full commit SHAs. To update:
+
+```bash
+pre-commit autoupdate --freeze
+```
+
+`--freeze` resolves the latest tagged release to a commit SHA. Review the diff against the upstream repo's actual release before committing — verify the SHA appears on the published Releases page, not just the moving tag.
+
+For GitHub Actions in `.github/workflows/`, Dependabot opens weekly PRs that rewrite both the SHA and the `# vX.Y.Z` comment. Manual updates should follow the same pattern: SHA in the `uses:`, version in a trailing comment.
