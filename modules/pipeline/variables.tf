@@ -71,6 +71,21 @@ variable "logging" {
   default = {}
 }
 
+variable "yank_detection" {
+  description = "Yank / unpublish / malware-advisory detection configuration. See root variables.tf for semantics."
+  type = object({
+    enabled  = optional(bool, true)
+    schedule = optional(string, "rate(1 hour)")
+    sources  = optional(list(string), ["upstream", "osv"])
+    response = optional(object({
+      yanked      = optional(string, "unlist")
+      unpublished = optional(string, "dispose")
+      malicious   = optional(string, "dispose")
+    }), {})
+  })
+  default = {}
+}
+
 variable "log_retention_days" {
   description = "CloudWatch Logs retention (days) for all Lambda log groups in the pipeline."
   type        = number

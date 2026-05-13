@@ -47,3 +47,18 @@ output "notification_topic_kms_key_arn" {
   description = "KMS CMK ARN for the module-managed notifications topic. Null when the topic was supplied by the consumer."
   value       = try(aws_kms_key.notifications[0].arn, null)
 }
+
+output "yank_audit_table_name" {
+  description = "Name of the sibling DynamoDB table recording yank/unpublish/malware detections. Null when yank_detection.enabled is false."
+  value       = try(aws_dynamodb_table.yank_audit[0].name, null)
+}
+
+output "yank_audit_table_arn" {
+  description = "ARN of the yank audit table. Null when yank_detection.enabled is false."
+  value       = try(aws_dynamodb_table.yank_audit[0].arn, null)
+}
+
+output "yank_check_lambda_arn" {
+  description = "ARN of the scheduled yank-check Lambda. Null when yank_detection.enabled is false."
+  value       = try(aws_lambda_function.yank_check[0].arn, null)
+}

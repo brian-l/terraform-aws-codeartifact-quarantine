@@ -37,6 +37,14 @@ The expedite path skips the cooldown for security patches. Authorization is **IA
 
 Restrict `lambda:InvokeFunction` on the expedite Lambda to the principals that should be allowed to *request* expedites (security team, on-call engineers, approved CI roles). Audit who has it as carefully as you audit who can approve.
 
+### CodeArtifact serves cached versions as canonical
+
+CodeArtifact never re-fetches a package version once it has been cached. If a version is yanked, deprecated, unpublished, or flagged as malicious upstream *after* it landed in staging, CodeArtifact will continue serving the cached bytes via prod's upstream chain indefinitely — there is no mechanism in CodeArtifact itself to invalidate a cached version against the upstream state.
+
+This is the most operationally significant caveat of the soft-gate model and the reason the module ships **scheduled yank detection** (`var.pipeline.yank_detection`, enabled by default). The detector polls PyPI yank metadata, npm packument deprecations/unpublishes, and OSV.dev malware advisories on a configurable schedule (default hourly) and applies a configured response (`unlist` / `dispose` / `delete` / `alert`) to both staging and prod copies of newly-yanked versions. See README → "Handling yanked / unpublished / malicious packages" for the full configuration surface and the operational notes (first-run alert volume, `delete` destroys audit evidence, etc.).
+
+If you disable `yank_detection.enabled` (or scope `sources = []`), you accept this risk explicitly: a confirmed-malicious version cached in your staging repo before the advisory landed will keep installing for your consumers until someone manually disposes it.
+
 ### The Inspector v2 enablement (`var.enable_inspector`)
 
 When set to `true`, the module enables Inspector v2 CodeArtifact scanning on the **entire AWS account**, not just this module's domain. Inspector has its own pricing model and surface. Leave this `false` if another module or process already owns Inspector enablement.

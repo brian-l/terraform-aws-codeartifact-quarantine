@@ -4,6 +4,14 @@ All notable changes to this module are documented in this file. The format follo
 
 ## [Unreleased]
 
+### Added
+
+- **Yank / unpublish / malware-advisory detection** for cached package versions. A scheduled Lambda (default `rate(1 hour)`) enumerates every version in the staging repos and checks each against PyPI yank metadata (PEP 592), npm packument deprecations + missing-from-packument unpublish detection, and OSV.dev malware advisories. On a newly observed yank/unpublish/malicious verdict the Lambda always publishes to the existing SNS topic + writes to a sibling `<name>-yank-audit` DynamoDB table, and (per the configured response per status) calls `UpdatePackageVersionsStatus` / `DisposePackageVersions` / `DeletePackageVersions` on both the staging and prod copies. Configurable via the new `var.pipeline.yank_detection` block: `enabled` (default true), `schedule`, `sources` (subset of `upstream` / `osv`), and `response.yanked` / `response.unpublished` / `response.malicious` (one of `alert` / `unlist` / `dispose` / `delete`). Defaults: yanked→unlist, unpublished→dispose, malicious→dispose. State preserved across runs in `<name>-yank-state` for idempotency. New outputs `yank_audit_table_name`, `yank_audit_table_arn`, `yank_check_lambda_arn`. See README → "Handling yanked / unpublished / malicious packages" for the operational notes.
+
+### Documentation
+
+- README "Developer experience: how packages reach prod" section documenting the **soft-gate operating model as the recommended default**: prod transparently upstreams from staging so first installs succeed immediately, and the pipeline curates which versions are durably retained in prod. Strict install-time blocking (via `package_groups` with `upstream = "BLOCK"`) is documented as opt-in with its operational trade-offs (first-dev-pays-the-cooldown, lockfile-diff pre-warming, bulk-promote-before-flipping). Architecture-section bullet on the two-repo airlock cross-links to it. `examples/simple/main.tf` header annotated to identify the config as the soft-gate model.
+
 ## [0.1.1] - 2026-05-13
 
 ### Added

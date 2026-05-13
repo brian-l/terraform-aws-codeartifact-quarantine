@@ -100,6 +100,31 @@ variable "pipeline" {
       # and (during human-approval states) the SFN task token. Default false.
       include_execution_data = optional(bool, false)
     }), {})
+
+    # Yank / unpublish / malware-advisory detection. A Lambda runs on the
+    # configured EventBridge schedule, enumerates cached versions in each
+    # staging repo, checks each against the listed sources, and (on a newly
+    # observed yank) takes the configured response. See README → "Handling
+    # yanked / unpublished / malicious packages".
+    #
+    # response values:
+    #   - "alert"   : SNS notification only, no state change
+    #   - "unlist"  : mark Unlisted in staging + prod (resolver skips for new
+    #                 resolutions; pinned lockfiles still install)
+    #   - "dispose" : mark Disposed in staging + prod (downloads fail, audit
+    #                 metadata preserved)
+    #   - "delete"  : hard-delete the version from staging + prod (destroys
+    #                 audit trail; reserved for explicit operator action)
+    yank_detection = optional(object({
+      enabled  = optional(bool, true)
+      schedule = optional(string, "rate(1 hour)")
+      sources  = optional(list(string), ["upstream", "osv"])
+      response = optional(object({
+        yanked      = optional(string, "unlist")
+        unpublished = optional(string, "dispose")
+        malicious   = optional(string, "dispose")
+      }), {})
+    }), {})
   })
 
   validation {
@@ -130,6 +155,29 @@ variable "pipeline" {
   validation {
     condition     = contains(["OFF", "ALL", "ERROR", "FATAL"], var.pipeline.logging.level)
     error_message = "pipeline.logging.level must be one of OFF, ALL, ERROR, FATAL."
+  }
+
+  validation {
+    condition = alltrue([
+      for s in var.pipeline.yank_detection.sources : contains(["upstream", "osv"], s)
+    ])
+    error_message = "pipeline.yank_detection.sources entries must be 'upstream' or 'osv'."
+  }
+
+  validation {
+    condition = alltrue([
+      for r in [
+        var.pipeline.yank_detection.response.yanked,
+        var.pipeline.yank_detection.response.unpublished,
+        var.pipeline.yank_detection.response.malicious,
+      ] : contains(["alert", "unlist", "dispose", "delete"], r)
+    ])
+    error_message = "pipeline.yank_detection.response.* values must be 'alert', 'unlist', 'dispose', or 'delete'."
+  }
+
+  validation {
+    condition     = can(regex("^(rate\\(|cron\\()", var.pipeline.yank_detection.schedule))
+    error_message = "pipeline.yank_detection.schedule must be an EventBridge schedule expression (rate(...) or cron(...))."
   }
 }
 
