@@ -62,3 +62,8 @@ output "yank_check_lambda_arn" {
   description = "ARN of the scheduled yank-check Lambda. Null when yank_detection.enabled is false."
   value       = try(aws_lambda_function.yank_check[0].arn, null)
 }
+
+output "proactive_fill_lambda_arn" {
+  description = "ARN of the scheduled proactive-fill Lambda. Null when proactive_fill.enabled is false."
+  value       = try(aws_lambda_function.proactive_fill[0].arn, null)
+}

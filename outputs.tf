@@ -107,3 +107,8 @@ output "yank_check_lambda_arn" {
   description = "ARN of the scheduled yank-check Lambda. Null when yank_detection.enabled is false."
   value       = module.pipeline.yank_check_lambda_arn
 }
+
+output "proactive_fill_lambda_arn" {
+  description = "ARN of the scheduled proactive-fill Lambda. Null when proactive_fill.enabled is false."
+  value       = module.pipeline.proactive_fill_lambda_arn
+}

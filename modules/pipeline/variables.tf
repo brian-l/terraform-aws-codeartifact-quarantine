@@ -23,6 +23,12 @@ variable "source_repo_names" {
   type        = list(string)
 }
 
+variable "repository_formats" {
+  description = "Map of ecosystem (npm|pypi|...) to the staging repository name handling that ecosystem's external connection. Used by the proactive_fill Lambda to route allowlist entries to the correct repo."
+  type        = map(string)
+  default     = {}
+}
+
 variable "source_repo_arns" {
   description = "ARNs of the source repositories, used for IAM scoping."
   type        = list(string)
@@ -82,6 +88,22 @@ variable "yank_detection" {
       unpublished = optional(string, "dispose")
       malicious   = optional(string, "dispose")
     }), {})
+  })
+  default = {}
+}
+
+variable "proactive_fill" {
+  description = "Proactive cache-fill configuration (follow-mode + optional allowlist). See root variables.tf for semantics."
+  type = object({
+    enabled             = optional(bool, true)
+    schedule            = optional(string, "rate(1 hour)")
+    include_prereleases = optional(bool, false)
+    max_fetches_per_run = optional(number, 200)
+    allowlist = optional(list(object({
+      format              = string
+      name                = string
+      include_prereleases = optional(bool)
+    })), [])
   })
   default = {}
 }

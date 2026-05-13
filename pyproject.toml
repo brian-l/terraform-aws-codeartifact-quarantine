@@ -63,6 +63,7 @@ exclude = [
   "lambda/expedite/common",
   "lambda/approve/common",
   "lambda/yank_check/common",
+  "lambda/proactive_fill/common",
   # Tests use heavy mocking + dynamic patterns that conflict with pyright strict.
   # Lint production code rigorously; let tests stay flexible.
   "lambda/tests",

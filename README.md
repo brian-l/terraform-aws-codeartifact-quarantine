@@ -24,6 +24,7 @@ But client-side cooldowns leak: a forgetful CI runner, a dev with custom `.npmrc
 - **Human-approval gate** triggered by findings, wired through SNS.
 - **Audit trail** of every promotion (and rejection) in DynamoDB.
 - **Yank / unpublish / malware detection** on cached versions, via a scheduled Lambda that checks each cached version against upstream registry metadata (PEP 592 / npm deprecation) and OSV.dev advisories. Configurable response (alert / unlist / dispose / delete) — see "Handling yanked / unpublished / malicious packages" below.
+- **Proactive cache-fill** pulls new upstream versions into staging on a schedule (follow-mode + optional allowlist) so the quarantine pipeline runs ahead of consumer demand — by the time anyone needs a version, it's already vetted and in prod. See "Proactive cache-fill" below.
 - **Optional `internal-repo`** for first-party packages, bypassing the quarantine.
 - **Package group origin controls** as configuration — codifies the dependency-confusion defense.
 - **Expedite path** for security patches: one Lambda invoke, same audit trail, no waiting.
@@ -124,6 +125,45 @@ The Lambda is idempotent across runs — a state table (`<name>-yank-state`) rec
 - **`delete` is destructive.** It removes the audit metadata along with the artifact. The module exposes it as an option but never defaults to it; reserve for explicit operator action after triage.
 - **OSV opt-out**: drop `"osv"` from `sources` if you don't want the soft runtime dependency on `api.osv.dev`. You lose malware-advisory coverage but keep upstream yank detection.
 - **Custom schedule**: bump to `rate(15 minutes)` for higher-stakes environments, or `rate(1 day)` for low-traffic ones. The state table caches results between runs so cost scales with *new arrivals*, not total cache size.
+
+### Proactive cache-fill
+
+Soft-gate's main weakness is latency: a version isn't scanned until the *first developer* asks for it. The cooldown + scan + audit chain runs while that developer waits. Proactive cache-fill closes that gap — a scheduled Lambda pulls new upstream versions into staging on its own, so the pipeline runs ahead of demand and the audit row exists before anyone needs the version.
+
+Two modes are stacked:
+
+- **Follow-mode** (always on when `enabled = true`): for every package already cached in a staging repo, the Lambda queries the upstream registry on each cycle and fetches any new versions that aren't in staging yet. The watch set scales naturally with team usage — `lodash` you've already used gets every future `lodash` release pre-vetted; `crypto-js` you've never touched costs you nothing.
+- **Allowlist-mode** (opt-in via `allowlist`): explicit `{format, name}` entries get the same treatment even if no one has installed them yet. Right for known-critical deps where you want vetted versions ready before the first install.
+
+Defaults:
+
+```hcl
+pipeline = {
+  # ...
+  proactive_fill = {
+    enabled             = true
+    schedule            = "rate(1 hour)"
+    include_prereleases = false
+    max_fetches_per_run = 200
+    allowlist = [
+      # { format = "npm",  name = "@myorg/utils" },
+      # { format = "pypi", name = "fastapi", include_prereleases = true },
+    ]
+  }
+}
+```
+
+The fetch is triggered by an authenticated HTTPS GET against the staging repo's npm/pypi endpoint — exactly what `npm install` / `pip install` do, just programmatic. CodeArtifact handles the upstream pull as a side effect of the asset request, fires the existing `Package Version State Change` event, and the standard pipeline (scan → cooldown → optional approval → promote) takes over. **No changes to the existing pipeline** — proactive fill is just a different requester.
+
+Each fetch writes an audit row into the existing promotion audit table with `record_type = "proactive_fill"` and `decision = "fetched"`. The subsequent promotion writes a separate row with `record_type = "promotion"`, so you can join the two by `(package_arn, version)` to see the full lifecycle.
+
+#### Operational notes
+
+- **Pre-releases are skipped by default.** PyPI `1.0.0a1`-style pre-releases and npm `1.0.0-alpha`-style suffixes are detected by regex and not fetched. Override globally with `include_prereleases = true`, or per-allowlist-entry. The regex is pragmatic (not exhaustive) — we'd rather skip an unusual stable release than pull every alpha into the cache.
+- **First-run cost is real.** With an allowlist of 50 packages, the first run after enablement will fetch every published version of each (typically hundreds to thousands). The `max_fetches_per_run` cap (default 200) bounds the per-cycle work; on a busy first run, expect the cache to populate across several hourly cycles. The cap also protects against accidental allowlist explosions.
+- **Inspector scan cost scales with churn**, not cache size. Each new version → one scan ($0.09). For a 1k-package follow-set with ~5 new versions/year average that's ~$450/year on top of reactive scanning. Tolerable for most; configure `schedule` longer (e.g. `rate(4 hours)`) if you want to throttle.
+- **Disable per-pipeline if you don't want the runtime dep on PyPI/npm registries** — `proactive_fill = { enabled = false }`. Follow-mode goes away entirely, allowlist becomes inert.
+- **Closure-mode (transitive completion) is not yet implemented.** Today the module fetches direct entries only; transitive deps still cache-fill reactively. The strict-mode "first dev waits on transitives" problem is unsolved here — see the Strict-mode section below.
 
 ### Strict mode (opt-in)
 

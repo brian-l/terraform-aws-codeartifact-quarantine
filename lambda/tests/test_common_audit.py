@@ -89,12 +89,39 @@ def test_record_without_extra(fresh_module, mocker):
     )
 
     item = captured["Item"]
-    # Required fields only.
+    # Required fields only (record_type defaults to "promotion").
     assert set(item.keys()) == {
         "package_arn",
         "version_ts",
         "version",
         "decision",
         "execution",
+        "record_type",
         "ts",
     }
+    assert item["record_type"] == "promotion"
+
+
+def test_record_type_can_be_overridden(fresh_module, mocker):
+    audit = fresh_module("common.audit")
+    captured: dict = {}
+
+    def fake_put_item(**kwargs):
+        captured.update(kwargs)
+        return {}
+
+    mocker.patch.object(
+        audit._dynamodb,
+        "Table",
+        side_effect=lambda name: type("FakeTable", (), {"put_item": staticmethod(fake_put_item)})(),
+    )
+
+    audit.record(
+        "test-audit",
+        package_arn="arn:...:package/d/r/npm//lodash",
+        version="1.2.3",
+        decision="fetched",
+        execution="proactive-fill",
+        record_type="proactive_fill",
+    )
+    assert captured["Item"]["record_type"] == "proactive_fill"

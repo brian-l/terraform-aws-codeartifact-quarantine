@@ -125,6 +125,31 @@ variable "pipeline" {
         malicious   = optional(string, "dispose")
       }), {})
     }), {})
+
+    # Proactive cache-fill: pull new upstream versions into staging *before*
+    # the first developer asks. Two modes are stacked:
+    #
+    #   - Follow-mode (always on when enabled=true): for every package already
+    #     in staging, check upstream every <schedule> and pull any new versions.
+    #     The watch set grows naturally with team usage; no list to maintain.
+    #   - Allowlist-mode: explicitly named packages are pulled even if not yet
+    #     in staging. Right for known-critical deps you want vetted before
+    #     anyone needs them.
+    #
+    # Each fetched version flows through the existing pipeline (scan, cooldown,
+    # promote). Audit rows are written into the existing promotion audit table
+    # with `record_type = "proactive_fill"`.
+    proactive_fill = optional(object({
+      enabled             = optional(bool, true)
+      schedule            = optional(string, "rate(1 hour)")
+      include_prereleases = optional(bool, false)
+      max_fetches_per_run = optional(number, 200)
+      allowlist = optional(list(object({
+        format              = string         # "npm" | "pypi"
+        name                = string         # e.g. "lodash", "@scope/pkg", "fastapi"
+        include_prereleases = optional(bool) # per-entry override of the global default
+      })), [])
+    }), {})
   })
 
   validation {
@@ -178,6 +203,23 @@ variable "pipeline" {
   validation {
     condition     = can(regex("^(rate\\(|cron\\()", var.pipeline.yank_detection.schedule))
     error_message = "pipeline.yank_detection.schedule must be an EventBridge schedule expression (rate(...) or cron(...))."
+  }
+
+  validation {
+    condition     = can(regex("^(rate\\(|cron\\()", var.pipeline.proactive_fill.schedule))
+    error_message = "pipeline.proactive_fill.schedule must be an EventBridge schedule expression (rate(...) or cron(...))."
+  }
+
+  validation {
+    condition = alltrue([
+      for e in var.pipeline.proactive_fill.allowlist : contains(["npm", "pypi"], e.format)
+    ])
+    error_message = "pipeline.proactive_fill.allowlist[*].format must be 'npm' or 'pypi'."
+  }
+
+  validation {
+    condition     = var.pipeline.proactive_fill.max_fetches_per_run > 0
+    error_message = "pipeline.proactive_fill.max_fetches_per_run must be > 0."
   }
 }
 

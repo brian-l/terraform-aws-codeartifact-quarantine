@@ -27,11 +27,13 @@ module "pipeline" {
   target_repo_arn    = module.codeartifact.repositories[var.pipeline.target_repository].arn
   domain_kms_key_arn = module.codeartifact.domain_kms_key_arn
 
-  cooldown       = var.pipeline.cooldown
-  scanner        = var.pipeline.scanner
-  approval       = var.pipeline.approval
-  logging        = var.pipeline.logging
-  yank_detection = var.pipeline.yank_detection
+  cooldown           = var.pipeline.cooldown
+  scanner            = var.pipeline.scanner
+  approval           = var.pipeline.approval
+  logging            = var.pipeline.logging
+  yank_detection     = var.pipeline.yank_detection
+  proactive_fill     = var.pipeline.proactive_fill
+  repository_formats = local.repository_formats
 
   log_retention_days = var.log_retention_days
 

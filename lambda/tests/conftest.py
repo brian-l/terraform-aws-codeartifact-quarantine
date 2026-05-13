@@ -41,6 +41,14 @@ def _lambda_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setenv("NOTIFICATION_TOPIC_ARN", "arn:aws:sns:us-east-1:111111111111:test-notify")
     monkeypatch.setenv("YANK_RECHECK_SECONDS", "0")
     monkeypatch.setenv("YANK_MAX_WORKERS", "1")
+    monkeypatch.setenv("PROACTIVE_FILL_ALLOWLIST_JSON", "[]")
+    monkeypatch.setenv("PROACTIVE_FILL_INCLUDE_PRERELEASES", "false")
+    monkeypatch.setenv("PROACTIVE_FILL_MAX_FETCHES", "200")
+    monkeypatch.setenv(
+        "PROACTIVE_FILL_REPOS_BY_FORMAT",
+        '{"npm": "test-staging-npm", "pypi": "test-staging-pypi"}',
+    )
+    monkeypatch.setenv("PROACTIVE_FILL_HTTP_TIMEOUT", "5")
     yield
 
 
