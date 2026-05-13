@@ -103,4 +103,4 @@ jobs:
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Run pytest
-        run: pytest --cov=lambda --cov-report=term-missing --cov-fail-under=85
+        run: pytest

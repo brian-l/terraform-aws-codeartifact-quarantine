@@ -9,7 +9,7 @@
 # behaves at runtime.
 pythonpath = ["lambda"]
 testpaths = ["lambda/tests"]
-addopts = "--strict-markers --strict-config -ra"
+addopts = "--strict-markers --strict-config -ra --cov=lambda --cov-report=term-missing --cov-fail-under=100"
 filterwarnings = [
   "error",
   # boto3 ships internal DeprecationWarnings on older Pythons we don't care about;

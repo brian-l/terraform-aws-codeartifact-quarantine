@@ -137,6 +137,77 @@ def test_copy_version_no_namespace_no_revision(fresh_module):
     stubber.assert_no_pending_responses()
 
 
+def test_copy_version_no_namespace_with_revision(fresh_module):
+    ca = fresh_module("common.codeartifact")
+    stubber = Stubber(ca._client)
+    stubber.add_response(
+        "copy_package_versions",
+        {"successfulVersions": {}, "failedVersions": {}},
+        expected_params={
+            "domain": "my-domain",
+            "domainOwner": "111111111111",
+            "sourceRepository": "src-repo",
+            "destinationRepository": "tgt-repo",
+            "format": "pypi",
+            "package": "requests",
+            "versions": ["2.31.0"],
+            "versionRevisions": {"2.31.0": "rev-xyz"},
+            "allowOverwrite": False,
+            "includeFromUpstream": False,
+        },
+    )
+
+    with stubber:
+        ca.copy_version(
+            domain="my-domain",
+            owner="111111111111",
+            source_repo="src-repo",
+            target_repo="tgt-repo",
+            fmt="pypi",
+            namespace=None,
+            name="requests",
+            version="2.31.0",
+            revision="rev-xyz",
+        )
+
+    stubber.assert_no_pending_responses()
+
+
+def test_copy_version_with_namespace_no_revision(fresh_module):
+    ca = fresh_module("common.codeartifact")
+    stubber = Stubber(ca._client)
+    stubber.add_response(
+        "copy_package_versions",
+        {"successfulVersions": {}, "failedVersions": {}},
+        expected_params={
+            "domain": "my-domain",
+            "domainOwner": "111111111111",
+            "sourceRepository": "src-repo",
+            "destinationRepository": "tgt-repo",
+            "format": "npm",
+            "namespace": "types",
+            "package": "node",
+            "versions": ["1.0.0"],
+            "allowOverwrite": False,
+            "includeFromUpstream": False,
+        },
+    )
+
+    with stubber:
+        ca.copy_version(
+            domain="my-domain",
+            owner="111111111111",
+            source_repo="src-repo",
+            target_repo="tgt-repo",
+            fmt="npm",
+            namespace="types",
+            name="node",
+            version="1.0.0",
+        )
+
+    stubber.assert_no_pending_responses()
+
+
 def test_copy_version_with_namespace_and_revision(fresh_module):
     ca = fresh_module("common.codeartifact")
     stubber = Stubber(ca._client)
