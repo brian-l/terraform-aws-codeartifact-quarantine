@@ -51,7 +51,7 @@ to re-import the handler under test.
 
 ## Module structure
 
-See [`PLAN.md`](./PLAN.md) for the architecture and roadmap. Key invariants:
+Key invariants:
 
 - The root module composes three submodules: `codeartifact/`, `pipeline/`, `inspector/`.
 - The `codeartifact/` submodule owns all CodeArtifact resources and origin controls.
@@ -64,8 +64,7 @@ See [`PLAN.md`](./PLAN.md) for the architecture and roadmap. Key invariants:
 1. Add the variable to root `variables.tf` with `description`, `type`, optional `default`, and `validation` blocks for any non-trivial constraint.
 2. Pass through to the relevant submodule in `main.tf`.
 3. Add the corresponding variable declaration in the submodule's `variables.tf`.
-4. Update `PLAN.md` if the addition affects the public interface significantly.
-5. Update the relevant example(s) under `examples/` to demonstrate the new variable when appropriate.
+4. Update the relevant example(s) under `examples/` to demonstrate the new variable when appropriate.
 
 ## Releasing
 

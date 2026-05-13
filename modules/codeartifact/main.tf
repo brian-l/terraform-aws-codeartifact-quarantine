@@ -57,8 +57,7 @@ resource "aws_codeartifact_domain" "this" {
 #
 # Constraint: this supports a single layer of upstreams. A repo in
 # `with_upstream` may only reference repos in `leaf`. If you need a deeper
-# chain (A → B → C), a third resource would be required; flag in PLAN.md as a
-# v2 enhancement if anyone asks.
+# chain (A → B → C), a third resource would be required.
 # ---------------------------------------------------------------------------
 
 locals {

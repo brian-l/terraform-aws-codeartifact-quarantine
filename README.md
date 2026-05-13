@@ -14,8 +14,6 @@ Package-registry compromises are now a monthly occurrence (TanStack/Mistral, Sha
 
 But client-side cooldowns leak: a forgetful CI runner, a dev with custom `.npmrc`, or an AI agent that ignores workspace settings can bypass them. A **server-side** cooldown at the registry level is the obvious next layer. CodeArtifact has every primitive you need (EventBridge events, package version states, Inspector v2 scanning, copy-package-versions, package origin controls) but no off-the-shelf wiring. This module is that wiring.
 
-See [`PLAN.md`](./PLAN.md) for full architecture and roadmap.
-
 ---
 
 ## What you get
@@ -40,9 +38,18 @@ public registry ─► staging-repo ─► EventBridge ─► SQS ─► Step Fu
                                                               │                    ▲
                                                               └─► human-approve ───┘
                                                                   (on findings)
+
+internal-repo (optional) ─► consumers      # first-party packages, no quarantine
 ```
 
-For the full diagram, design rationale, and trade-offs, see [`PLAN.md`](./PLAN.md).
+### Design notes
+
+- **Two-repo airlock, not single-repo status flips.** Consumers point only at `prod-repo`; nothing ever points at `staging-repo`. Removes the race between EventBridge firing and a Lambda updating package state.
+- **EventBridge → SQS → Lambda**, not EventBridge → Lambda direct. SQS provides DLQ, retry, and replay — cheap insurance against transient Lambda failures.
+- **Step Functions for orchestration**, not one mega-Lambda. The cooldown is a SFN `Wait` state (Lambdas can't sleep for hours), `waitForTaskToken` cleanly handles human approval, and each step is independently retryable.
+- **Inspector v2 as the default scanner**, pluggable via `scanner.type = "lambda"`. Inspector covers npm/PyPI/Maven/NuGet/Gem; swap in Socket, Phylum, or your own behavioral scanner without forking.
+- **Package group origin controls are data**, not code (`var.package_groups`). The dependency-confusion defense (`pypi:myorg-* → Publish: ALLOW, Upstream: BLOCK`) is a row in your tfvars.
+- **Lambdas ship inline** as `archive_file` zips from `lambda/`. No external image build, no ECR repo. `terraform apply` is self-contained.
 
 ---
 
@@ -134,6 +141,8 @@ To stay focused and small:
 | AWS provider | >= 5.50.0 |
 | Python Lambda runtime | 3.12 |
 
+Versioning follows semver — breaking changes to the variable schema bump MAJOR.
+
 The module assumes you have:
 
 - An AWS account where you can create CodeArtifact, IAM, Lambda, Step Functions, EventBridge, SQS, DynamoDB, KMS, and (optionally) Inspector v2 resources.
@@ -167,4 +176,4 @@ MIT — see [`LICENSE`](./LICENSE).
 
 ## Contributing
 
-This is pre-1.0; the variable schema may change. Issues and PRs welcome but please open an issue to discuss before sending non-trivial patches. See `PLAN.md` for the design intent — changes that conflict with stated non-goals or design decisions will be redirected there for discussion first.
+This is pre-1.0; the variable schema may change. Issues and PRs welcome but please open an issue to discuss before sending non-trivial patches.

@@ -89,7 +89,7 @@ repos:
         additional_dependencies:
           - "boto3-stubs[essential,codeartifact,inspector2,lambda,sns,sqs,stepfunctions,dynamodb]==1.43.6"
 
-  # ── Spell-check long-form prose (READMEs, PLAN.md) ───────────────────────
+  # ── Spell-check long-form prose (READMEs, CHANGELOG, SECURITY, ...) ──────
   - repo: https://github.com/crate-ci/typos
     rev: 9d890159570d5018df91fedfa40b4730cd4a81b1  # v1.28.4
     hooks:
