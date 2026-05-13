@@ -230,7 +230,23 @@ variable "log_retention_days" {
 }
 
 variable "tags" {
-  description = "Tags applied to all created resources."
+  description = <<-EOT
+    Tags applied to every taggable resource the module creates. Merged with two
+    module-managed keys (`module`, `module-name`); user-supplied values win on
+    conflict. Use `var.required_tag_keys` to enforce presence of compliance
+    tags (data-classification, owner, cost-center, etc.) at plan time.
+  EOT
   type        = map(string)
   default     = {}
+}
+
+variable "required_tag_keys" {
+  description = <<-EOT
+    List of tag keys that must be present in `var.tags`. Plan fails if any
+    listed key is missing. Use this to enforce ISO / SOC2 / internal compliance
+    schemas (e.g. ["data-classification", "owner", "cost-center",
+    "environment"]).
+  EOT
+  type        = list(string)
+  default     = []
 }

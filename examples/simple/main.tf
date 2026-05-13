@@ -63,9 +63,21 @@ module "quarantine" {
     }
   }
 
+  # Tags applied to every taggable resource the module creates. The keys listed
+  # in required_tag_keys are enforced at plan time — drop one and plan fails
+  # with a clear message. Use this to encode an ISO 27001 / SOC2 tag schema.
+  required_tag_keys = [
+    "data-classification",
+    "owner",
+    "cost-center",
+    "environment",
+  ]
+
   tags = {
-    Environment = "sandbox"
-    Owner       = "platform-eng"
+    data-classification = "internal"
+    owner               = "platform-eng"
+    cost-center         = "eng-platform"
+    environment         = "sandbox"
   }
 }
 

@@ -185,6 +185,11 @@ resource "awscc_codeartifact_package_group" "this" {
     }
   }
 
+  # AWSCC takes tags as a list of {key, value} objects rather than the map<string>
+  # format used by the hashicorp/aws provider; convert here so callers still pass
+  # tags as a map via var.tags.
+  tags = [for k, v in var.tags : { key = k, value = v }]
+
   depends_on = [
     aws_codeartifact_repository.leaf,
     aws_codeartifact_repository.with_upstream,
