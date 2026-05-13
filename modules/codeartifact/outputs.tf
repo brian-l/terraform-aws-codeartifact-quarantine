@@ -1,13 +1,16 @@
 output "domain_name" {
-  value = aws_codeartifact_domain.this.domain
+  description = "CodeArtifact domain name."
+  value       = aws_codeartifact_domain.this.domain
 }
 
 output "domain_arn" {
-  value = aws_codeartifact_domain.this.arn
+  description = "CodeArtifact domain ARN."
+  value       = aws_codeartifact_domain.this.arn
 }
 
 output "domain_kms_key_arn" {
-  value = local.domain_kms_key_arn
+  description = "KMS key ARN used to encrypt the CodeArtifact domain."
+  value       = local.domain_kms_key_arn
 }
 
 output "repositories" {

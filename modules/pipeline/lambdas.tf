@@ -29,12 +29,12 @@ locals {
   # Timestamp / TimestampPath — there's no Duration field. We support the
   # subset of ISO-8601 our config needs: P<D>D and PT<H>H / PT<M>M / PT<S>S
   # (and combinations like "P1DT12H"). Fail loudly on anything else.
-  _cooldown_match = regex("^P(?:(?P<d>[0-9]+)D)?(?:T(?:(?P<h>[0-9]+)H)?(?:(?P<m>[0-9]+)M)?(?:(?P<s>[0-9]+)S)?)?$", var.cooldown)
+  cooldown_match = regex("^P(?:(?P<d>[0-9]+)D)?(?:T(?:(?P<h>[0-9]+)H)?(?:(?P<m>[0-9]+)M)?(?:(?P<s>[0-9]+)S)?)?$", var.cooldown)
   cooldown_seconds = (
-    tonumber(coalesce(local._cooldown_match.d, "0")) * 86400
-    + tonumber(coalesce(local._cooldown_match.h, "0")) * 3600
-    + tonumber(coalesce(local._cooldown_match.m, "0")) * 60
-    + tonumber(coalesce(local._cooldown_match.s, "0"))
+    tonumber(coalesce(local.cooldown_match.d, "0")) * 86400
+    + tonumber(coalesce(local.cooldown_match.h, "0")) * 3600
+    + tonumber(coalesce(local.cooldown_match.m, "0")) * 60
+    + tonumber(coalesce(local.cooldown_match.s, "0"))
   )
 
   # Shared common/ files included in every Lambda zip. We assemble the zip

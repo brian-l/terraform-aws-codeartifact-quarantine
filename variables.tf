@@ -202,33 +202,6 @@ variable "enable_inspector" {
   default     = false
 }
 
-variable "pre_promote_lambda_arn" {
-  description = "Optional Lambda invoked after scan, before copy. Can veto promotion by returning non-zero status."
-  type        = string
-  default     = null
-}
-
-variable "post_promote_lambda_arn" {
-  description = "Optional Lambda invoked after successful promotion. Best-effort; failures do not roll back."
-  type        = string
-  default     = null
-}
-
-variable "policy_storage" {
-  description = <<-EOT
-    Where the pipeline policy lives.
-    - "env": baked into Lambda env vars (immutable until next terraform apply)
-    - "ssm": stored in SSM Parameter Store (editable without re-applying)
-  EOT
-  type        = string
-  default     = "env"
-
-  validation {
-    condition     = contains(["env", "ssm"], var.policy_storage)
-    error_message = "policy_storage must be 'env' or 'ssm'."
-  }
-}
-
 variable "log_retention_days" {
   description = "CloudWatch Logs retention for all Lambda log groups."
   type        = number

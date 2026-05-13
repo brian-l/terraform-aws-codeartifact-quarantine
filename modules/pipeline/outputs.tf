@@ -1,33 +1,41 @@
 output "state_machine_arn" {
-  value = aws_sfn_state_machine.quarantine.arn
+  description = "ARN of the quarantine Step Functions state machine."
+  value       = aws_sfn_state_machine.quarantine.arn
 }
 
 output "audit_table_name" {
-  value = aws_dynamodb_table.audit.name
+  description = "Name of the DynamoDB audit table recording every promotion decision."
+  value       = aws_dynamodb_table.audit.name
 }
 
 output "audit_table_arn" {
-  value = aws_dynamodb_table.audit.arn
+  description = "ARN of the DynamoDB audit table."
+  value       = aws_dynamodb_table.audit.arn
 }
 
 output "sqs_queue_arn" {
-  value = aws_sqs_queue.ingestion.arn
+  description = "ARN of the ingestion SQS queue (EventBridge target)."
+  value       = aws_sqs_queue.ingestion.arn
 }
 
 output "sqs_dlq_arn" {
-  value = aws_sqs_queue.dlq.arn
+  description = "ARN of the ingestion dead-letter queue."
+  value       = aws_sqs_queue.dlq.arn
 }
 
 output "expedite_lambda_arn" {
-  value = aws_lambda_function.expedite.arn
+  description = "ARN of the expedite Lambda used to skip cooldown for an explicitly approved package version."
+  value       = aws_lambda_function.expedite.arn
 }
 
 output "expedite_lambda_function_name" {
-  value = aws_lambda_function.expedite.function_name
+  description = "Function name of the expedite Lambda (use with `aws lambda invoke`)."
+  value       = aws_lambda_function.expedite.function_name
 }
 
 output "approval_lambda_arn" {
-  value = aws_lambda_function.approve.arn
+  description = "ARN of the approval Lambda that resumes the state machine with a human decision."
+  value       = aws_lambda_function.approve.arn
 }
 
 output "notification_topic_arn" {
