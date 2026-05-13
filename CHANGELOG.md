@@ -4,6 +4,8 @@ All notable changes to this module are documented in this file. The format follo
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-05-13
+
 ### Added
 
 - `var.pipeline.approval.notification_arn` is now optional. When unset (the new default) the module creates a hardened SNS topic: dedicated customer-managed KMS key, topic resource policy locked to the Step Functions role for publish, zero subscriptions. Consumers attach their own IAM-controlled subscribers against `module.<name>.notification_topic_arn`. Pass an explicit ARN only when sharing a pre-existing topic — SECURITY.md documents the properties that pre-existing topic must satisfy.
@@ -12,9 +14,19 @@ All notable changes to this module are documented in this file. The format follo
 - Managed consumer IAM policy (`var.create_consumer_policy`, default `true`) granting the minimum permissions a downstream workload needs to pull from the prod repository: `codeartifact:GetAuthorizationToken` / `GetDomainPermissionsPolicy` on the domain, read/list/describe on the prod repo (ARN + `arn/*`), and `sts:GetServiceBearerToken` scoped to `codeartifact.amazonaws.com`. Exposed via `consumer_policy_arn`; the raw JSON is always available via `consumer_policy_document` for inline use.
 - Unit test suite for all six Lambda handlers and the shared `common/` modules (53 tests). Uses `botocore.stub.Stubber` for AWS API mocking — no live AWS calls or extra service emulators. CI runs the suite with a coverage gate via the `astral-sh/setup-uv` action.
 
+### Changed
+
+- CI now installs `tflint`, `trivy`, and `terraform-docs` ahead of the pre-commit-terraform hooks so they actually run on every PR.
+- Module variable and output descriptions filled in across `modules/codeartifact/` and `modules/pipeline/` to satisfy `terraform_documented_variables` / `terraform_documented_outputs`. Standard-module-structure gaps closed (empty `outputs.tf` in `modules/inspector/`, empty `main.tf` in `modules/pipeline/`, `outputs.tf` split out of `examples/simple/main.tf`).
+
+### Removed
+
+- `var.pre_promote_lambda_arn`, `var.post_promote_lambda_arn`, and `var.policy_storage` were declared at the root but never wired through the pipeline module — they did nothing. Will be reintroduced alongside the implementation when those features land.
+
 ### Fixed
 
 - `_iso8601_to_seconds` in the ingestion handler now uses a regex parser supporting the full subset of ISO-8601 durations the module uses (D + H + M + S in any combination, e.g. `P1DT12H`, `PT1H30M45S`). The previous parser silently ignored seconds and certain combinations.
+- Renamed the internal `_cooldown_match` local in `modules/pipeline/` to `cooldown_match` to satisfy `terraform_naming_convention`.
 
 ## [0.1.0] - 2026-05-12
 
