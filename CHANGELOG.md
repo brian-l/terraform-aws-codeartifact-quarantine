@@ -6,6 +6,7 @@ All notable changes to this module are documented in this file. The format follo
 
 ### Added
 
+- `var.pipeline.approval.notification_arn` is now optional. When unset (the new default) the module creates a hardened SNS topic: dedicated customer-managed KMS key, topic resource policy locked to the Step Functions role for publish, zero subscriptions. Consumers attach their own IAM-controlled subscribers against `module.<name>.notification_topic_arn`. Pass an explicit ARN only when sharing a pre-existing topic — SECURITY.md documents the properties that pre-existing topic must satisfy.
 - `var.required_tag_keys` lets operators enforce presence of compliance tag keys (e.g. `data-classification`, `owner`, `cost-center`, `environment`) at plan time. Missing keys produce a `check` failure naming the gap. Supports ISO/SOC2 tagging schemas.
 - `awscc_codeartifact_package_group` resources now receive `var.tags` (converted to the AWSCC list-of-objects format). All other taggable resources were already tagged.
 - Managed consumer IAM policy (`var.create_consumer_policy`, default `true`) granting the minimum permissions a downstream workload needs to pull from the prod repository: `codeartifact:GetAuthorizationToken` / `GetDomainPermissionsPolicy` on the domain, read/list/describe on the prod repo (ARN + `arn/*`), and `sts:GetServiceBearerToken` scoped to `codeartifact.amazonaws.com`. Exposed via `consumer_policy_arn`; the raw JSON is always available via `consumer_policy_document` for inline use.

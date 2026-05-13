@@ -96,7 +96,7 @@ resource "aws_sfn_state_machine" "quarantine" {
     cooldown_seconds   = local.cooldown_seconds
     approval_required  = var.approval.required_when
     approval_timeout   = var.approval.timeout
-    notification_arn   = var.approval.notification_arn
+    notification_arn   = local.notification_arn
   })
 
   logging_configuration {

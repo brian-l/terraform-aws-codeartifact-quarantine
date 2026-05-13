@@ -69,6 +69,12 @@ variable "pipeline" {
     - scanner.block_on_severity: Inspector severities that trigger findings.
     - approval.required_when: "always" | "findings" | "never".
     - approval.notification_arn: SNS topic for findings + approval requests.
+      Optional — when null (the default) the module creates a hardened SNS
+      topic: KMS-encrypted with a dedicated CMK, topic policy restricted to
+      the Step Functions role for publish, no subscriptions (consumers add
+      their own IAM-controlled subscribers). The ARN is exposed via the
+      `notification_topic_arn` output. Override only when you need to share a
+      pre-existing topic across pipelines.
   EOT
   type = object({
     source_repositories = list(string)
@@ -82,7 +88,7 @@ variable "pipeline" {
     approval = object({
       required_when    = string
       timeout          = optional(string, "P14D")
-      notification_arn = string
+      notification_arn = optional(string)
     })
     logging = optional(object({
       # Step Functions log level: OFF | ALL | ERROR | FATAL. Default ERROR keeps

@@ -49,7 +49,7 @@ variable "approval" {
   type = object({
     required_when    = string
     timeout          = optional(string, "P14D")
-    notification_arn = string
+    notification_arn = optional(string)
   })
 }
 

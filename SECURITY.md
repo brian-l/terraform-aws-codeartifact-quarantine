@@ -17,7 +17,9 @@ This module is composed; some security properties depend on configuration the co
 
 The state machine's human-approval gate uses Step Functions' `waitForTaskToken` integration with SNS. **The task token is published in the SNS message body.** Anyone who can read the message — through a topic subscription, a downstream queue, an email delivery, an SMS, or historical delivery records — can call `SendTaskSuccess` and resolve the approval. The token grants execution-level authority, not topic-level, but a leaked token bypasses your human-review gate.
 
-The module cannot enforce these properties on a consumer-provided topic; they are your responsibility:
+**Default (recommended): leave `notification_arn` unset.** The module creates a hardened topic — dedicated KMS CMK, topic policy locked to the Step Functions role for publish, no subscriptions. The ARN is exposed via `module.<name>.notification_topic_arn`; consumers attach IAM-controlled subscribers (Lambda or SQS) themselves. The module enforces every property below for the topic it manages.
+
+**Override path:** pass an existing topic ARN only when you need to share a single topic across multiple pipelines or fan in from other systems. In that case the module cannot enforce the properties below — they become your responsibility:
 
 - **No email or SMS subscriptions.** Both deliver the token in plaintext to an inbox/handset the recipient may share, screenshot, or store insecurely. If you want human notifications, fan out through an internal Lambda that strips the token before re-emitting.
 - **SSE-KMS encryption on the topic** (`kms_master_key_id`). Without it, message bodies are stored unencrypted at rest in SNS.

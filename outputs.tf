@@ -82,3 +82,13 @@ output "sqs_dlq_arn" {
   description = "ARN of the dead-letter queue for failed event processing."
   value       = module.pipeline.sqs_dlq_arn
 }
+
+output "notification_topic_arn" {
+  description = "Resolved ARN of the SNS topic the state machine publishes to. Subscribe IAM-controlled consumers (Lambdas, SQS) here — see SECURITY.md."
+  value       = module.pipeline.notification_topic_arn
+}
+
+output "notification_topic_kms_key_arn" {
+  description = "KMS CMK ARN encrypting the module-managed notifications topic. Null when var.pipeline.approval.notification_arn was set."
+  value       = module.pipeline.notification_topic_kms_key_arn
+}

@@ -311,7 +311,22 @@ data "aws_iam_policy_document" "sfn" {
   }
   statement {
     actions   = ["sns:Publish"]
-    resources = [var.approval.notification_arn]
+    resources = [local.notification_arn]
+  }
+
+  # When the module manages the notifications topic + CMK, the SFN role also
+  # needs to GenerateDataKey/Decrypt on the CMK to publish encrypted messages.
+  # When consumers supply their own topic ARN, they own the corresponding KMS
+  # permissions on their topic's key.
+  dynamic "statement" {
+    for_each = local.create_notification_topic ? [1] : []
+    content {
+      actions = [
+        "kms:GenerateDataKey*",
+        "kms:Decrypt",
+      ]
+      resources = [aws_kms_key.notifications[0].arn]
+    }
   }
   statement {
     actions = [

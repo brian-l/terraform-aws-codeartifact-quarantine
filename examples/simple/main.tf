@@ -20,10 +20,14 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# Notifications: where the module emits approval requests and block alerts.
-# In a real deployment, subscribe Slack/email/PagerDuty to this topic.
-resource "aws_sns_topic" "security" {
-  name = "codeartifact-quarantine-alerts"
+# Tag schema enforced by the module via required_tag_keys below.
+locals {
+  tags = {
+    data-classification = "internal"
+    owner               = "platform-eng"
+    cost-center         = "eng-platform"
+    environment         = "sandbox"
+  }
 }
 
 module "quarantine" {
@@ -57,9 +61,11 @@ module "quarantine" {
       type              = "inspector"
       block_on_severity = ["HIGH", "CRITICAL"]
     }
+    # notification_arn left unset — the module creates a hardened SNS topic
+    # (KMS-encrypted, publish locked to the SFN role). Subscribe consumers
+    # (e.g. a Slack-bot Lambda) to module.quarantine.notification_topic_arn.
     approval = {
-      required_when    = "findings"
-      notification_arn = aws_sns_topic.security.arn
+      required_when = "findings"
     }
   }
 
@@ -73,12 +79,7 @@ module "quarantine" {
     "environment",
   ]
 
-  tags = {
-    data-classification = "internal"
-    owner               = "platform-eng"
-    cost-center         = "eng-platform"
-    environment         = "sandbox"
-  }
+  tags = local.tags
 }
 
 # ── Outputs consumers wire into their .npmrc / pyproject.toml ──────────────
@@ -91,6 +92,11 @@ output "npm_registry" {
 output "pypi_index_url" {
   description = "Set as `index-url` in pyproject.toml [tool.uv] / pip.conf"
   value       = module.quarantine.repository_endpoints["prod"].pypi
+}
+
+output "notification_topic_arn" {
+  description = "SNS topic the state machine publishes approval requests and alerts to. Subscribe IAM-controlled compute (Lambda, SQS) here — see SECURITY.md."
+  value       = module.quarantine.notification_topic_arn
 }
 
 output "expedite_command" {
