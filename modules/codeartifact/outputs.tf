@@ -37,3 +37,18 @@ output "repository_endpoints" {
 }
 
 data "aws_region" "current" {}
+
+output "consumer_policy_document" {
+  description = "JSON IAM policy granting read access to the prod repository. Attach to consumer roles inline, or use consumer_policy_arn for the managed policy."
+  value       = data.aws_iam_policy_document.consumer.json
+}
+
+output "consumer_policy_arn" {
+  description = "ARN of the managed IAM policy granting read access to the prod repository. Null when create_consumer_policy is false."
+  value       = try(aws_iam_policy.consumer[0].arn, null)
+}
+
+output "consumer_policy_name" {
+  description = "Name of the managed IAM policy. Null when create_consumer_policy is false."
+  value       = try(aws_iam_policy.consumer[0].name, null)
+}

@@ -28,6 +28,21 @@ output "repository_endpoints" {
   value       = module.codeartifact.repository_endpoints
 }
 
+output "consumer_policy_arn" {
+  description = "ARN of the managed IAM policy granting read access to the prod repository. Attach to consumer roles via aws_iam_role_policy_attachment. Null when create_consumer_policy is false."
+  value       = module.codeartifact.consumer_policy_arn
+}
+
+output "consumer_policy_name" {
+  description = "Name of the managed IAM policy. Null when create_consumer_policy is false."
+  value       = module.codeartifact.consumer_policy_name
+}
+
+output "consumer_policy_document" {
+  description = "JSON IAM policy granting read access to the prod repository, for inline use when the managed policy is disabled."
+  value       = module.codeartifact.consumer_policy_document
+}
+
 output "audit_table_name" {
   description = "DynamoDB table name for the audit trail."
   value       = module.pipeline.audit_table_name

@@ -8,6 +8,9 @@ module "codeartifact" {
   package_groups      = var.package_groups
   consumer_principals = var.consumer_principals
 
+  create_consumer_policy = var.create_consumer_policy
+  consumer_policy_name   = var.consumer_policy_name
+
   tags = local.tags
 }
 

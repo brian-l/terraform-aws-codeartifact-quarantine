@@ -6,6 +6,7 @@ All notable changes to this module are documented in this file. The format follo
 
 ### Added
 
+- Managed consumer IAM policy (`var.create_consumer_policy`, default `true`) granting the minimum permissions a downstream workload needs to pull from the prod repository: `codeartifact:GetAuthorizationToken` / `GetDomainPermissionsPolicy` on the domain, read/list/describe on the prod repo (ARN + `arn/*`), and `sts:GetServiceBearerToken` scoped to `codeartifact.amazonaws.com`. Exposed via `consumer_policy_arn`; the raw JSON is always available via `consumer_policy_document` for inline use.
 - Unit test suite for all six Lambda handlers and the shared `common/` modules (53 tests). Uses `botocore.stub.Stubber` for AWS API mocking — no live AWS calls or extra service emulators. CI runs the suite with a coverage gate via the `astral-sh/setup-uv` action.
 
 ### Fixed

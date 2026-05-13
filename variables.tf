@@ -166,6 +166,26 @@ variable "consumer_principals" {
   default     = []
 }
 
+variable "create_consumer_policy" {
+  description = <<-EOT
+    Whether to create a managed IAM policy granting the minimum permissions a
+    workload needs to consume packages from the prod repository
+    (GetAuthorizationToken / GetDomainPermissionsPolicy on the domain,
+    read/list/describe on the prod repo, sts:GetServiceBearerToken scoped to
+    codeartifact). The policy ARN is exposed via the consumer_policy_arn
+    output. Set to false if you prefer to attach the JSON inline via
+    consumer_policy_document.
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "consumer_policy_name" {
+  description = "Override the IAM policy name. Defaults to '<name>-consumer'."
+  type        = string
+  default     = null
+}
+
 variable "enable_inspector" {
   description = <<-EOT
     Enable Inspector v2 CodeArtifact scanning. Account-wide side effect.

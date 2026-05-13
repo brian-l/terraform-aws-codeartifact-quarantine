@@ -34,6 +34,24 @@ variable "consumer_principals" {
   default = []
 }
 
+variable "create_consumer_policy" {
+  description = <<-EOT
+    Whether to create a managed IAM policy that grants the minimum permissions
+    needed to read from the prod repository (GetAuthorizationToken /
+    GetDomainPermissionsPolicy on the domain, read/list/describe on the prod
+    repo, sts:GetServiceBearerToken for codeartifact). Consumers attach the
+    policy to roles they own.
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "consumer_policy_name" {
+  description = "Override the IAM policy name. Defaults to '<name>-consumer'."
+  type        = string
+  default     = null
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

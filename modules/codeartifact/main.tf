@@ -274,3 +274,81 @@ resource "aws_codeartifact_domain_permissions_policy" "consumer" {
   domain          = aws_codeartifact_domain.this.domain
   policy_document = data.aws_iam_policy_document.domain_consumer[0].json
 }
+
+# ---------------------------------------------------------------------------
+# Consumer identity-side IAM policy.
+#
+# Downstream workloads (CI runners, EC2/EKS/Lambda roles) need an identity
+# policy granting:
+#   1. codeartifact:GetAuthorizationToken / GetDomainPermissionsPolicy on the
+#      domain — required to call get-authorization-token at all.
+#   2. read/describe/list actions on the prod repository ARN and its package
+#      sub-resources (arn/*).
+#   3. sts:GetServiceBearerToken on *, scoped via the sts:AWSServiceName
+#      condition to codeartifact.amazonaws.com. STS bearer tokens cannot be
+#      authorized via the CodeArtifact domain resource policy — they must come
+#      from the caller's identity policy.
+#
+# Always emits the JSON via `consumer_policy_document` output for inline use.
+# When `create_consumer_policy` is true (default) also materialises an
+# aws_iam_policy that consumers attach with aws_iam_role_policy_attachment.
+# ---------------------------------------------------------------------------
+
+data "aws_iam_policy_document" "consumer" {
+  statement {
+    sid    = "DomainAuth"
+    effect = "Allow"
+    actions = [
+      "codeartifact:GetAuthorizationToken",
+      "codeartifact:GetDomainPermissionsPolicy",
+    ]
+    resources = [aws_codeartifact_domain.this.arn]
+  }
+
+  statement {
+    sid    = "ProdRepoRead"
+    effect = "Allow"
+    actions = [
+      "codeartifact:DescribeRepository",
+      "codeartifact:GetRepositoryEndpoint",
+      "codeartifact:ReadFromRepository",
+      "codeartifact:ListPackages",
+      "codeartifact:ListPackageVersions",
+      "codeartifact:ListPackageVersionAssets",
+      "codeartifact:ListPackageVersionDependencies",
+      "codeartifact:DescribePackageVersion",
+      "codeartifact:GetPackageVersionAsset",
+      "codeartifact:GetPackageVersionReadme",
+    ]
+    # Two resources: the repository itself (for repo-level actions like
+    # DescribeRepository / GetRepositoryEndpoint / ReadFromRepository) and
+    # arn/* (for package-level actions whose resource ARN is
+    # <repo-arn>/<format>/<namespace>/<name>).
+    resources = [
+      local.repositories["prod"].arn,
+      "${local.repositories["prod"].arn}/*",
+    ]
+  }
+
+  statement {
+    sid       = "ServiceBearerToken"
+    effect    = "Allow"
+    actions   = ["sts:GetServiceBearerToken"]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "sts:AWSServiceName"
+      values   = ["codeartifact.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_policy" "consumer" {
+  count = var.create_consumer_policy ? 1 : 0
+
+  name        = coalesce(var.consumer_policy_name, "${var.name}-consumer")
+  description = "Read access to the ${var.name} CodeArtifact prod repository."
+  policy      = data.aws_iam_policy_document.consumer.json
+
+  tags = var.tags
+}
