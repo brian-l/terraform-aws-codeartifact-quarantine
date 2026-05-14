@@ -23,8 +23,8 @@ But client-side cooldowns leak: a forgetful CI runner, a dev with custom `.npmrc
 - **Inspector v2 scanning** by default; pluggable Lambda for Socket / Phylum / custom behavioral scanners.
 - **Human-approval gate** triggered by findings, wired through SNS.
 - **Audit trail** of every promotion (and rejection) in DynamoDB.
-- **Yank / unpublish / malware detection** on cached versions, via a scheduled Lambda that checks each cached version against upstream registry metadata (PEP 592 / npm deprecation) and OSV.dev advisories. Configurable response (alert / unlist / dispose / delete) — see "Handling yanked / unpublished / malicious packages" below.
-- **Proactive cache-fill** pulls new upstream versions into staging on a schedule (follow-mode + optional allowlist) so the quarantine pipeline runs ahead of consumer demand — by the time anyone needs a version, it's already vetted and in prod. See "Proactive cache-fill" below.
+- **Yank / unpublish / malware detection** on cached versions (opt-in, `var.pipeline.yank_detection.enabled = true`), via a scheduled Lambda that checks each cached version against upstream registry metadata (PEP 592 / npm deprecation) and OSV.dev advisories. Configurable response (alert / unlist / dispose / delete) — see "Handling yanked / unpublished / malicious packages" below.
+- **Proactive cache-fill** (opt-in, `var.pipeline.proactive_fill.enabled = true`) pulls new upstream versions into staging on a schedule (follow-mode + optional allowlist) so the quarantine pipeline runs ahead of consumer demand — by the time anyone needs a version, it's already vetted and in prod. See "Proactive cache-fill" below.
 - **Optional `internal-repo`** for first-party packages, bypassing the quarantine.
 - **Package group origin controls** as configuration — codifies the dependency-confusion defense.
 - **Expedite path** for security patches: one Lambda invoke, same audit trail, no waiting.
@@ -82,6 +82,8 @@ For most teams adopting CodeArtifact as a defense-in-depth layer on top of clien
 
 CodeArtifact treats a cached package version as canonical and never re-fetches it. Once `left-pad@1.3.0` lives in staging, an upstream yank, deprecation, security removal, or post-publication malware advisory has no effect on what your consumers see — staging keeps serving the cached bytes via the upstream chain. **This is the most operationally significant caveat of the soft-gate model**, and the module ships an opt-out-able compensating control.
 
+**Opt-in**: set `var.pipeline.yank_detection.enabled = true` to create the Lambda, tables, and schedule; the module ships with the feature off so an upgrade from 0.1.1 doesn't create resources without consent.
+
 The `yank_detection` block (under `var.pipeline`) wires up a Lambda that runs on an EventBridge schedule (default hourly), enumerates every version cached in staging, and checks each against:
 
 - **Upstream registry.** PyPI's PEP 592 yank metadata, npm's `deprecated` field + missing-from-packument detection (the closest equivalents).
@@ -95,7 +97,7 @@ Defaults:
 pipeline = {
   # ...
   yank_detection = {
-    enabled  = true
+    enabled  = true   # opt-in; the module default is false
     schedule = "rate(1 hour)"
     sources  = ["upstream", "osv"]
     response = {
@@ -130,6 +132,8 @@ The Lambda is idempotent across runs — a state table (`<name>-yank-state`) rec
 
 Soft-gate's main weakness is latency: a version isn't scanned until the *first developer* asks for it. The cooldown + scan + audit chain runs while that developer waits. Proactive cache-fill closes that gap — a scheduled Lambda pulls new upstream versions into staging on its own, so the pipeline runs ahead of demand and the audit row exists before anyone needs the version.
 
+**Opt-in**: set `var.pipeline.proactive_fill.enabled = true` to create the Lambda + schedule. Default is off — an upgrade from 0.1.1 doesn't add scheduled fetches without consent.
+
 Two modes are stacked:
 
 - **Follow-mode** (always on when `enabled = true`): for every package already cached in a staging repo, the Lambda queries the upstream registry on each cycle and fetches any new versions that aren't in staging yet. The watch set scales naturally with team usage — `lodash` you've already used gets every future `lodash` release pre-vetted; `crypto-js` you've never touched costs you nothing.
@@ -141,7 +145,7 @@ Defaults:
 pipeline = {
   # ...
   proactive_fill = {
-    enabled             = true
+    enabled             = true   # opt-in; the module default is false
     schedule            = "rate(1 hour)"
     include_prereleases = false
     max_fetches_per_run = 200

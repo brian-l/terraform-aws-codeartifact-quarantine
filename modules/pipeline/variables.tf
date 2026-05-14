@@ -80,7 +80,7 @@ variable "logging" {
 variable "yank_detection" {
   description = "Yank / unpublish / malware-advisory detection configuration. See root variables.tf for semantics."
   type = object({
-    enabled  = optional(bool, true)
+    enabled  = optional(bool, false)
     schedule = optional(string, "rate(1 hour)")
     sources  = optional(list(string), ["upstream", "osv"])
     response = optional(object({
@@ -95,7 +95,7 @@ variable "yank_detection" {
 variable "proactive_fill" {
   description = "Proactive cache-fill configuration (follow-mode + optional allowlist). See root variables.tf for semantics."
   type = object({
-    enabled             = optional(bool, true)
+    enabled             = optional(bool, false)
     schedule            = optional(string, "rate(1 hour)")
     include_prereleases = optional(bool, false)
     max_fetches_per_run = optional(number, 200)

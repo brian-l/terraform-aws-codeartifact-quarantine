@@ -116,7 +116,7 @@ variable "pipeline" {
     #   - "delete"  : hard-delete the version from staging + prod (destroys
     #                 audit trail; reserved for explicit operator action)
     yank_detection = optional(object({
-      enabled  = optional(bool, true)
+      enabled  = optional(bool, false)
       schedule = optional(string, "rate(1 hour)")
       sources  = optional(list(string), ["upstream", "osv"])
       response = optional(object({
@@ -140,7 +140,7 @@ variable "pipeline" {
     # promote). Audit rows are written into the existing promotion audit table
     # with `record_type = "proactive_fill"`.
     proactive_fill = optional(object({
-      enabled             = optional(bool, true)
+      enabled             = optional(bool, false)
       schedule            = optional(string, "rate(1 hour)")
       include_prereleases = optional(bool, false)
       max_fetches_per_run = optional(number, 200)
