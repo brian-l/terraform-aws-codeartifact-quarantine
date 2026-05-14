@@ -92,3 +92,23 @@ output "notification_topic_kms_key_arn" {
   description = "KMS CMK ARN encrypting the module-managed notifications topic. Null when var.pipeline.approval.notification_arn was set."
   value       = module.pipeline.notification_topic_kms_key_arn
 }
+
+output "yank_audit_table_name" {
+  description = "DynamoDB table recording yank/unpublish/malware detections. Null when yank_detection.enabled is false."
+  value       = module.pipeline.yank_audit_table_name
+}
+
+output "yank_audit_table_arn" {
+  description = "ARN of the yank audit table. Null when yank_detection.enabled is false."
+  value       = module.pipeline.yank_audit_table_arn
+}
+
+output "yank_check_lambda_arn" {
+  description = "ARN of the scheduled yank-check Lambda. Null when yank_detection.enabled is false."
+  value       = module.pipeline.yank_check_lambda_arn
+}
+
+output "proactive_fill_lambda_arn" {
+  description = "ARN of the scheduled proactive-fill Lambda. Null when proactive_fill.enabled is false."
+  value       = module.pipeline.proactive_fill_lambda_arn
+}

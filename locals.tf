@@ -1,4 +1,24 @@
 locals {
+  # Map of ecosystem → staging repo name handling that ecosystem's public
+  # external connection. Used to route proactive_fill allowlist entries to the
+  # right repo. one() errors if multiple repos claim the same upstream — by
+  # design (CodeArtifact allows one external_connection per repo, but two
+  # different repos could each declare "public:npmjs"; that's a config bug).
+  npm_staging_repo = one([
+    for k, v in var.repositories : module.codeartifact.repositories[k].name
+    if try(v.external_connection, null) == "public:npmjs"
+  ])
+  pypi_staging_repo = one([
+    for k, v in var.repositories : module.codeartifact.repositories[k].name
+    if try(v.external_connection, null) == "public:pypi"
+  ])
+  repository_formats = merge(
+    local.npm_staging_repo == null ? {} : { npm = local.npm_staging_repo },
+    local.pypi_staging_repo == null ? {} : { pypi = local.pypi_staging_repo },
+  )
+}
+
+locals {
   # Canonical tag set merged into every resource.
   tags = merge(
     {

@@ -1,5 +1,13 @@
 # Minimal example: staging + prod, 24h cooldown, Inspector scan, no approval.
 #
+# Operating model: soft-gate (the recommended default). prod transparently
+# upstreams from staging, so a developer's first `npm install` of a net-new
+# package succeeds immediately via the upstream chain. The pipeline curates
+# which versions are physically *retained* in prod, scans them, and writes an
+# audit record per promotion. See README → "Developer experience" for the
+# trade-offs vs. strict install-time blocking (which requires adding
+# `package_groups` entries with `upstream = "BLOCK"` on the prod repo).
+#
 # Run:
 #   cd lambda && make
 #   cd ../examples/simple

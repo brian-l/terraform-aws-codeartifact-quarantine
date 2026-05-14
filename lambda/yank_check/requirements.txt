@@ -1,0 +1,1 @@
+# No third-party runtime deps — stdlib + boto3 (Lambda-provided).
